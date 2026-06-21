@@ -124,3 +124,14 @@ git push -u origin feature/<task-name>
 ## Структура проекта
 
 Описание директорий будет добавлено после формирования архитектуры проекта.
+
+
+
+
+frfjfslkdfsld
+fsdfskdf
+fsdf
+sdf
+sd
+fsd
+fs
