@@ -3,8 +3,8 @@
 ## Требования
 
 * Git
-* Python 3.13.
-* uv
+* Python 3.13 (3.13.5)
+* uv (https://docs.astral.sh/uv/getting-started/installation/#installing-uv)
 
 Проверить установку:
 
@@ -13,11 +13,19 @@ python --version
 uv --version
 git --version
 ```
-
+---
+Если вы не пользовались гитхабом до этого или не привязывали SSH ключ, то стоит это сделать
+Инструкция: https://docs.github.com/en/authentication/connecting-to-github-with-ssh
 ---
 
 ## Клонирование репозитория
 
+Перейдите в директорию с проектами (или создайте, если таковой нет)
+```bash
+mkdir ~/Projects
+cd ~/Projects
+```
+Там клонируйте репозиторий
 ```bash
 git clone git@github.com:IU-B25-Sum26-RO1/llm-planner.git
 cd <repository>
