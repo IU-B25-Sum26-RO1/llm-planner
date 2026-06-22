@@ -14,8 +14,10 @@ uv --version
 git --version
 ```
 ---
-Если вы не пользовались гитхабом до этого или не привязывали SSH ключ, то стоит это сделать
+Если вы не пользовались гитхабом до этого или не привязывали SSH ключ, то стоит это сделать.
+
 Инструкция: https://docs.github.com/en/authentication/connecting-to-github-with-ssh
+
 ---
 
 ## Клонирование репозитория
@@ -33,12 +35,13 @@ cd <repository>
 
 ---
 
-## Установка зависимостей
+## Установка пакетов
 
 Создание виртуального окружения и установка всех зависимостей:
 
 ```bash
 uv sync
+# Должно появиться новое виртуальное окружение
 ```
 
 ---
@@ -77,7 +80,7 @@ uv add <package>
 uv add fastapi
 ```
 
-После добавления зависимости необходимо закоммитить:
+После добавления зависимости необходимо коммитить:
 
 * pyproject.toml
 * uv.lock
@@ -89,8 +92,9 @@ uv add fastapi
 Перед началом работы:
 
 ```bash
-git pull
-uv sync
+git switch main # переключаемся на main-ветку (локальную)
+git pull origin main # подтягиваем изменения из origin (Github) в main (локально)
+uv sync # синхронизируемся по pyproject.toml и uv.lock
 ```
 
 ---
@@ -98,6 +102,8 @@ uv sync
 ## Работа с ветками
 
 Создать новую ветку:
+
+Вообще любые изменения проводить в новой ветке и пушить в неё же. Потом, после того, как вы закончили работу, запросить Pull Request.   
 
 ```bash
 git switch -c feature/<task-name>
@@ -112,8 +118,13 @@ git switch -c feature/voice-control
 После завершения работы:
 
 ```bash
-git add .
-git commit -m "Describe changes"
+git status # Какие файлы претерпели изменения
+```
+
+```bash
+git add . # Все измененные файлы
+# git add <path_to_file> - добавление файлов по одному
+git commit -m "Describe changes" 
 git push -u origin feature/<task-name>
 ```
 
@@ -123,15 +134,4 @@ git push -u origin feature/<task-name>
 
 ## Структура проекта
 
-Описание директорий будет добавлено после формирования архитектуры проекта.
-
-
-
-
-frfjfslkdfsld
-fsdfskdf
-fsdf
-sdf
-sd
-fsd
-fs
+<!-- TODO: После согласования добавить структуру -->
