@@ -134,4 +134,14 @@ git push -u origin feature/<task-name>
 
 ## Структура проекта
 
-<!-- TODO: После согласования добавить структуру -->
+```
+app
+|___audio
+|   |___recording
+|   |___recognizing
+|   |___llm 
+|___video
+|   |?
+|___act
+    |?
+```
