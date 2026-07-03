@@ -4,7 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
-from audio.llm_decomposer import LLMClient
+from audio.decomposer import LLMClient
 from audio.recorder import Recorder
 from audio.recognizer import Recognizer
 
