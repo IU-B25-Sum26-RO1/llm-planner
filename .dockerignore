@@ -1,0 +1,15 @@
+.git
+.gitignore
+.gitattributes
+.venv
+__pycache__/
+*.pyc
+
+README.md
+CONTRIBUTING.md
+LICENSE
+docs/
+
+.python-version
+
+models/
