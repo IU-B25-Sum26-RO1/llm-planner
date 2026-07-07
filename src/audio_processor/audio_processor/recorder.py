@@ -1,5 +1,5 @@
 import asyncio
-import queue
+import os
 import sounddevice as sd
 
 
@@ -17,7 +17,8 @@ class Recorder:
             blocksize=self.blocksize,
             channels=self.channels,
             dtype='int16',
-            callback=self._callback
+            callback=self._callback,
+            device=os.environ.get('AUDIO_DEVICE')
         )
 
     def _callback(self, indata, frames, time, status):

@@ -1,0 +1,52 @@
+services:
+  audio_processor:
+    build: .
+    image: llm_planner_image:latest
+    container_name: audio_processor_container
+
+    devices:
+      - /dev/snd:/dev/snd
+
+    environment:
+      - VOSK_MODEL=${VOSK_MODEL}
+      - AUDIO_SAMPLERATE=${AUDIO_SAMPLERATE}
+      - AUDIO_BLOCK_SIZE=${AUDIO_BLOCK_SIZE}
+
+      - PULSE_SERVER=${PULSE_SERVER}
+      - AUDIO_DEVICE=${AUDIO_DEVICE}
+      # - XDG_RUNTIME_DIR=/tmp
+      # - PULSE_COOKIE=/tmp/pulse-cookie-dir/cookie
+    network_mode: "host"
+    ipc: host
+    volumes:
+      - /dev/shm:/dev/shm
+      - ${HOST_VOSK_MODELS_PATH}:/workspace/models
+      - ./src:/workspace/src
+
+      # - ${HOST_PULSE_SOCKET_PATH:-/run/user/1000/pulse}:/tmp/pulse
+      - /mnt/wslg/PulseServer:/mnt/wslg/PulseServer
+
+      - ./asound.conf:/etc/asound.conf:ro
+      # - ./pulse-client.conf:/etc/pulse/client.conf:ro
+    group_add:
+      - audio
+    restart: unless-stopped
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run audio_processor audio_processor"
+
+  decomposer:
+    image: llm_planner_image:latest
+    container_name: decomposer_container
+    depends_on:
+      - audio_processor
+    environment:
+      - LLM_API_URL=${LLM_API_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - SYS_PROMPT_PATH=${SYS_PROMPT_PATH}
+    network_mode: "host"
+    ipc: host
+    volumes:
+      - /dev/shm:/dev/shm
+      - ./src:/workspace/src
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run decomposer decomposer"
+    restart: unless-stopped
