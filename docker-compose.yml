@@ -50,3 +50,6 @@ services:
       - ./src:/workspace/src
     command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run decomposer decomposer"
     restart: unless-stopped
+
+  simulation:
+    
