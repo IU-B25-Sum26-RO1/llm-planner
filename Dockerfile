@@ -5,7 +5,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y \
-    ros-humble-ros-gz \
+    ros-humble-gazebo-ros-pkgs \
+    ros-humble-ur \
+    ros-humble-gazebo-ros2-control \
+    ros-humble-ros2-controllers \
     python3-colcon-common-extensions \
     curl \
     libasound2-dev \
