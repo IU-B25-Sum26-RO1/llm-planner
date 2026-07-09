@@ -7,6 +7,9 @@ services:
     devices:
       - /dev/snd:/dev/snd
 
+    network_mode: "host"
+    ipc: host
+
     environment:
       - VOSK_MODEL=${VOSK_MODEL}
       - AUDIO_SAMPLERATE=${AUDIO_SAMPLERATE}
@@ -16,8 +19,6 @@ services:
       - AUDIO_DEVICE=${AUDIO_DEVICE}
       # - XDG_RUNTIME_DIR=/tmp
       # - PULSE_COOKIE=/tmp/pulse-cookie-dir/cookie
-    network_mode: "host"
-    ipc: host
     volumes:
       - /dev/shm:/dev/shm
       - ${HOST_VOSK_MODELS_PATH}:/workspace/models
@@ -38,13 +39,15 @@ services:
     container_name: decomposer_container
     depends_on:
       - audio_processor
+    
+    network_mode: "host"
+    ipc: host
+
     environment:
       - LLM_API_URL=${LLM_API_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - SYS_PROMPT_PATH=${SYS_PROMPT_PATH}
-    network_mode: "host"
-    ipc: host
     volumes:
       - /dev/shm:/dev/shm
       - ./src:/workspace/src
@@ -52,4 +55,24 @@ services:
     restart: unless-stopped
 
   simulation:
+    image: llm_planner_image:latest
+    container_name: simulation_container
+    depends_on:
+      - audio_processor
     
+    devices:
+      - /dev/dxg:/dev/dxg
+
+    network_mode: "host"
+    ipc: host
+    
+    environment:
+      - DISPLAY=${DISPLAY}
+      - LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+    
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /usr/lib/wsl:/usr/lib/wsl
+      - ./src:/workspace/src
+    
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py"    

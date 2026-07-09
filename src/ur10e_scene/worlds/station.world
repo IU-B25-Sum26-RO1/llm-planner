@@ -1,0 +1,72 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="ur10e_station">
+    
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        
+        <collision name="top_col">
+          <pose>0 0 0.785 0 0 0</pose>
+          <geometry><box><size>1.0 1.0 0.03</size></box></geometry>
+        </collision>
+        <visual name="top_vis">
+          <pose>0 0 0.785 0 0 0</pose>
+          <geometry><box><size>1.0 1.0 0.03</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Carbon</name></script></material>
+        </visual>
+
+        <collision name="leg1_col"><pose>0.45 0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry></collision>
+        <visual name="leg1_vis"><pose>0.45 0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/DarkGrey</name></script></material></visual>
+
+        <collision name="leg2_col"><pose>-0.45 0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry></collision>
+        <visual name="leg2_vis"><pose>-0.45 0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/DarkGrey</name></script></material></visual>
+
+        <collision name="leg3_col"><pose>0.45 -0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry></collision>
+        <visual name="leg3_vis"><pose>0.45 -0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/DarkGrey</name></script></material></visual>
+
+        <collision name="leg4_col"><pose>-0.45 -0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry></collision>
+        <visual name="leg4_vis"><pose>-0.45 -0.45 0.385 0 0 0</pose><geometry><box><size>0.05 0.05 0.77</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/DarkGrey</name></script></material></visual>
+      </link>
+    </model>
+
+    <model name="green_cube">
+      <pose>0.3 0.2 0.825 0 0 0</pose>
+      <link name="link">
+        <inertial><mass>0.05</mass></inertial>
+        <collision name="collision"><geometry><box><size>0.05 0.05 0.05</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Green</name></script></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="white_tray">
+      <pose>0.3 -0.2 0.8 0 0 0</pose>
+      <link name="link">
+        <inertial><mass>0.15</mass></inertial>
+        
+        <collision name="bottom_col"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry></collision>
+        <visual name="bottom_vis"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
+        
+        <collision name="wall1_col"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
+        <visual name="wall1_vis"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
+        
+        <collision name="wall2_col"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
+        <visual name="wall2_vis"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
+        
+        <collision name="wall3_col"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
+        <visual name="wall3_vis"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
+        
+        <collision name="wall4_col"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
+        <visual name="wall4_vis"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
