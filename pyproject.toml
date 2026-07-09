@@ -8,6 +8,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.138.0",
     "openai>=2.44.0",
+    "opencv-python-headless>=5.0.0.93",
     "pydantic>=2.13.4",
     "sounddevice>=0.5.5",
     "soundfile>=0.14.0",
