@@ -77,7 +77,7 @@ class DecomposerNode(Node):
             out_msg.data = json_string
             self.json_publisher.publish(out_msg)
 
-            self.get_logger().info(f"Successfully published JSON output to /decomposed_json")
+            self.get_logger().info(f"Successfully published JSON output to /decomposed_json:" + json_string)
         
         except Exception as e:
             self.get_logger().error(f"Failed to process or publish decomposition: {str(e)}")
