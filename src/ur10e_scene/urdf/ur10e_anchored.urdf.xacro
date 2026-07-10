@@ -26,4 +26,16 @@
     </plugin>
   </gazebo>
 
+  <xacro:include filename="$(find ur10e_scene)/urdf/gripper_urdf/gripper.urdf" />
+
+  <joint name="gripper_mount_joint" type="fixed">
+    <parent link="tool0" />
+    <child link="gripper_base_link" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+  <xacro:include filename="$(find ur10e_scene)/urdf/realsense_d435.xacro" />
+
+  <xacro:realsense_d435 parent="world">
+    <origin xyz="0 0 1.8" rpy="0 1.57079632679 0" />
+  </xacro:realsense_d435>
 </robot>

@@ -1,0 +1,50 @@
+<mujoco model="linear_gripper">
+  <compiler angle="radian" meshdir="meshes" autolimits="true"/>
+
+  <option integrator="implicitfast"/>
+
+  <asset>
+    <mesh name="base" file="base.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="tip" file="tip.stl" scale="0.001 0.001 0.001"/>
+
+    <material name="dark_gray" rgba="0.75 0.75 0.72 1"/>
+  </asset>
+
+  <default>
+    <joint damping="8" frictionloss="1"/>
+    <geom type="mesh" material="dark_gray" friction="1 0.3 0.001"/>
+  </default>
+
+  <worldbody>
+    <body name="base_link">
+      <inertial pos="0 0 0.0055" mass="0.8" diaginertia="0.001245 0.002728 0.003051"/>
+      <geom name="base_geom" mesh="base"/>
+
+      <body name="left_jaw_link" pos="-0.04488 0.000189 0.09354972">
+        <inertial pos="0 0 0" mass="0.15" diaginertia="0.000151 0.000258 0.000156"/>
+        <joint name="left_jaw_joint" type="slide" axis="1 0 0" range="0 0.068"/>
+        <geom name="left_jaw_geom" mesh="tip" pos="-0.041639558 -0.013 -0.04754972"/>
+      </body>
+
+      <body name="right_jaw_link" pos="0.04488 0.000189 0.09354972">
+        <inertial pos="0 0 0" mass="0.15" diaginertia="0.000151 0.000258 0.000156"/>
+        <joint name="right_jaw_joint" type="slide" axis="-1 0 0" range="0 0.068"/>
+        <geom name="right_jaw_geom" mesh="tip" pos="0.041639558 0.013 -0.04754972" euler="0 0 3.14159265359"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="base_link" body2="left_jaw_link"/>
+    <exclude body1="base_link" body2="right_jaw_link"/>
+    <exclude body1="left_jaw_link" body2="right_jaw_link"/>
+  </contact>
+
+  <equality>
+    <joint joint1="right_jaw_joint" joint2="left_jaw_joint" polycoef="0 1 0 0 0"/>
+  </equality>
+
+  <actuator>
+    <position name="fingers_actuator" joint="left_jaw_joint" kp="2000" ctrlrange="0 0.068" forcerange="-120 120"/>
+  </actuator>
+</mujoco>
