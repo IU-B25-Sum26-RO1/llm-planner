@@ -19,7 +19,9 @@ class DecomposerNode(Node):
         env_model = os.environ.get('LLM_MODEL')
         env_sys_prompt_file_path = os.environ.get('SYS_PROMPT_PATH')
 
-        system_prompt = get_system_prompt(env_sys_prompt_file_path)
+        system_prompt = get_system_prompt(env_sys_prompt_file_path, logger=self.get_logger())
+
+        self.get_logger().info(f"System prompt loaded from {env_sys_prompt_file_path}: {system_prompt[:100]}...")
 
         self.declare_parameter('base_url', env_url)
         self.declare_parameter('api_key', env_key)
@@ -35,7 +37,8 @@ class DecomposerNode(Node):
             base_url=base_url,
             model=model,
             api_key=api_key,
-            system_prompt=system_prompt
+            system_prompt=system_prompt,
+            logger=self.get_logger()
         )
 
         self.json_publisher = self.create_publisher(String, '/decomposed_json', 10)
