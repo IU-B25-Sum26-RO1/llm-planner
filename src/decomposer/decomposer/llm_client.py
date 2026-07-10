@@ -38,4 +38,4 @@ class LLMClient:
             if self.logger:
                 self.logger.error(f"Error during LLM decomposition: {str(e)}")
             full_error = traceback.format_exc()
-            return {"error": str(e), "traceback": full_error}
+            return {"error": str(e)}
