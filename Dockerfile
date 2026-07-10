@@ -15,9 +15,6 @@ RUN apt-get update && apt-get install -y \
     libasound2-plugins \
     libportaudio2 \
     pulseaudio-utils \
-    # 4vl-utils \
-    # libgl1-mesa-glx \
-    # libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -28,8 +25,6 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv pip compile pyproject.toml -o requirements.txt && \
     uv pip sync requirements.txt --system 
-
-RUN uv add opencv-python-headless
 
 COPY ./prompts ./prompts
 
