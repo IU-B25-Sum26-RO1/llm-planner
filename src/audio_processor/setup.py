@@ -16,7 +16,7 @@ setup(
     maintainer='Aioma',
     maintainer_email='idfc1200@gmail.com',
     description='ROS2 Package for speech recognizing using Vosk',
-    license='Apache License 2.0',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>ROS2 Package for speech recognizing using Vosk</description>
   <maintainer email="idfc1200@gmail.com">Aioma</maintainer>
-  <license>Apache License 2.0</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>

@@ -13,10 +13,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='idfc1',
+    maintainer='Aioma',
     maintainer_email='idfc1200@gmail.com',
     description='TODO: Package description',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',
@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'preprocessor = sam3_preprocessor.preprocessor_node:main'
         ],
     },
 )

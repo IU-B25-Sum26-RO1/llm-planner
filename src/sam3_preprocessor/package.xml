@@ -4,8 +4,8 @@
   <name>sam3_preprocessor</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="idfc1200@gmail.com">idfc1</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="idfc1200@gmail.com">Aioma</maintainer>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
