@@ -21,7 +21,7 @@ class DecomposerNode(Node):
 
         system_prompt = get_system_prompt(env_sys_prompt_file_path, logger=self.get_logger())
 
-        self.get_logger().info(f"System prompt loaded from {env_sys_prompt_file_path}: {system_prompt[:100]}...")
+        self.get_logger().info(f"System prompt loaded from {env_sys_prompt_file_path}: {system_prompt[:50]}...")
 
         self.declare_parameter('base_url', env_url)
         self.declare_parameter('api_key', env_key)
