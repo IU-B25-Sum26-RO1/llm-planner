@@ -72,11 +72,37 @@ services:
     environment:
       - DISPLAY=${DISPLAY}
       - LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+
+      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS}
+      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH}
+      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT}
     
     volumes:
+      - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /usr/lib/wsl:/usr/lib/wsl
       - ./src:/workspace/src
     
-    # command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py"   
-    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash"     
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py && ros2 run rqt_image_view rqt_image_view"   
+    # command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash"     
+
+  sam3_preprocessor:
+    image: llm_planner_image:latest
+    container_name: sam3_preprocessor_container
+    depends_on:
+      - audio_processor
+    
+    network_mode: "host"
+    ipc: host
+
+    environment:
+      - CAMERA_RAW_TOPIC=${CAMERA_RAW_TOPIC}
+      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS}
+      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH}
+      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT}
+
+    volumes:
+      - /dev/shm:/dev/shm
+      - ./src:/workspace/src
+    
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run sam3_preprocessor preprocessor"
