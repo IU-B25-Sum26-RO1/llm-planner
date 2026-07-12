@@ -106,3 +106,21 @@ services:
       - ./src:/workspace/src
     
     command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run sam3_preprocessor preprocessor"
+
+  sam3_bridge:
+    image: llm_planner_image:latest
+    container_name: sam3_bridge_container
+    depends_on:
+      - audio_processor
+    
+    network_mode: "host"
+    ipc: host
+
+    environment:
+      - SAM3_SERVER_URL=${SAM3_SERVER_URL}
+    
+    volumes:
+      - /dev/shm:/dev/shm
+      - ./src:/workspace/src
+
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run sam3_bridge bridge"
