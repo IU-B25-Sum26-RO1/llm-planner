@@ -9,6 +9,7 @@ import aiohttp
 import rclpy
 import numpy as np
 from rclpy.node import Node
+from std_msgs.msg import String
 from sensor_msgs.msg import CompressedImage, Image
 import cv2
 from cv_bridge import CvBridge
@@ -19,6 +20,7 @@ class SAM3BridgeNode(Node):
         super().__init__('sam3_bridge_node')
         
         image_sub_topic = 'camera/color/image_raw/processed'
+        target_sub_topic = '/decomposer/json_output/target'
 
         raw_mask_pub_topic = '/sam3/output/mask_raw'
 
@@ -33,6 +35,13 @@ class SAM3BridgeNode(Node):
             1
         )
 
+        self.target_sub = self.create_subscription(
+            String,
+            target_sub_topic,
+            self.target_callback,
+            10
+        )
+
         self.raw_mask_pub = self.create_publisher(
             Image, raw_mask_pub_topic, 3
         )
@@ -40,21 +49,26 @@ class SAM3BridgeNode(Node):
         self.bridge = CvBridge()
 
         self.frame_queue = None
+        self.target_queue = None
+        self.loop = None
 
         self.latency_tracker = {}
 
-        self.loop = asyncio.new_event_loop()
         self.loop_thread = threading.Thread(target=self._run_async_loop, daemon=True)
         self.loop_thread.start()
-
-        asyncio.run_coroutine_threadsafe(self.websocket_orchestrator(), self.loop)
-
 
         self.get_logger().info('SAM3 Bridge Node | HTTP-client has started. Waiting server output')
 
     def _run_async_loop(self) -> None:
+        self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.loop.run_forever()
+        try:
+            self.loop.run_until_complete(self.websocket_orchestrator())
+        except Exception as e:
+            self.get_logger().critical(f"Async event loop crashed with: {str(e)}")
+        finally:
+            self.loop.close()
+            self.get_logger().info("Async event loop closed.")
 
     def image_callback(self, msg: CompressedImage) -> None:
         # self.get_logger().info("Image Callback | Received image")
@@ -70,12 +84,34 @@ class SAM3BridgeNode(Node):
         self.loop.call_soon_threadsafe(self.frame_queue.put_nowait, msg)
     
     def target_callback(self, msg: String):
-        # TODO: Отправка целевого объекта на сервер с SAM3
-        pass
+        if self.target_queue is None:
+            self.get_logger().warn("Prompt queue is not initialized yet. Dropping target")
+            return
+        
+        try:
+            target_data = json.loads(msg.data)
+
+            payload = {
+                "type": "update_prompts",
+                "target": target_data
+            }
+
+            self.loop.call_soon_threadsafe(self.target_queue.put_nowait, payload)
+            self.get_logger().info(f"[TARGET] New target queued from ROS topic.")
+
+        except json.JSONDecodeError:
+            self.get_logger().error(f"Received invalid JSON string in target_callback: {msg.data}")
+        except Exception as e:
+            self.get_logger().error(f"Error in target_callback: {e}")
 
     async def websocket_orchestrator(self):
+        self.loop = asyncio.get_running_loop()
+
         self.frame_queue = asyncio.Queue(maxsize=1)
+        self.target_queue = asyncio.Queue()
+
         timeout = aiohttp.ClientTimeout(total=None, connect=10.0)
+
         async with aiohttp.ClientSession(timeout=timeout) as session:
             while rclpy.ok():
                 try:
@@ -107,26 +143,60 @@ class SAM3BridgeNode(Node):
     
     async def send_loop(self, ws):
         self.get_logger().info('Send loop initialized and running.')
+
+        frame_task = asyncio.create_task(self.frame_queue.get())
+        target_task = asyncio.create_task(self.target_queue.get())
+
         try:
             while True:
-                msg: CompressedImage = await self.frame_queue.get()
+                
+                if ws.closed:
+                    self.get_logger().warn('[SEND] Websocket is closed. Exiting send loop.')
+                    break
 
-                frame_size_kb = len(msg.data) / 1024.0
-                self.get_logger().info(f'[SEND] Get frame from the queue. Size: {frame_size_kb:.1f} KB. Sending...')
+                done, _ = await asyncio.wait(
+                    [frame_task, target_task],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                try:
+                    if target_task in done:
+                        target_msg = target_task.result()
 
-                frame_id = f"{msg.header.stamp.sec}_{msg.header.stamp.nanosec}"
-                self.latency_tracker[frame_id] = self.get_clock().now()
+                        self.get_logger().info(f'[SEND] Sending target to server...')
+                        if not ws.closed:
+                            await ws.send_str(json.dumps(target_msg))
+                            self.get_logger().info(f'[SEND] Target sent.')
 
-                await ws.send_bytes(bytes(msg.data))
+                        target_task = asyncio.create_task(self.target_queue.get())
 
-                self.get_logger().info(f'[SEND] Frame {frame_id} sent.')
+                    elif frame_task in done:
+                        msg: CompressedImage = await self.frame_queue.get()
 
-                if len(self.latency_tracker) > 50:
-                    first_key = next(iter(self.latency_tracker))
-                    self.latency_tracker.pop(first_key, None)
+                        frame_size_kb = len(msg.data) / 1024.0
+                        # self.get_logger().info(f'[SEND] Get frame from the queue. Size: {frame_size_kb:.1f} KB. Sending...')
+
+                        frame_id = f"{msg.header.stamp.sec}_{msg.header.stamp.nanosec}"
+                        
+                        if not ws.closed:
+                            await ws.send_bytes(bytes(msg.data))
+                            self.latency_tracker[frame_id] = self.get_clock().now()
+
+                        # self.get_logger().info(f'[SEND] Frame {frame_id} sent.')
+
+                        if len(self.latency_tracker) > 50:
+                            first_key = next(iter(self.latency_tracker))
+                            self.latency_tracker.pop(first_key, None)
+
+                        frame_task = asyncio.create_task(self.frame_queue.get())
+                
+                except (RuntimeError, ConnectionResetError, aiohttp.ClientConnectionError) as write_err:
+                    self.get_logger().error(f'[SEND] Failed to write data (Socket closing/broken): {write_err}')
 
         except Exception as e:
             self.get_logger().warn(f'Send loop stopped due to CRITICAL ERROR: {str(e)}')
+        finally:
+            frame_task.cancel()
+            target_task.cancel()
 
 
     async def receive_loop(self, ws):
@@ -145,7 +215,7 @@ class SAM3BridgeNode(Node):
                     
                     for item in data:
                         if item.get("status") == "success":
-                            target_key = item.get("target_key")
+                            obj_id = item.get("obj_id")
                             b64_mask = item.get("mask")
                             
                             if not b64_mask:
@@ -160,7 +230,7 @@ class SAM3BridgeNode(Node):
                                 
                                 self.raw_mask_pub.publish(ros_mask_msg)
 
-                                self.get_logger().info(f'Mask published for target: {target_key}')
+                                self.get_logger().info(f'Mask published for target: {obj_id}')
                             else:
                                 self.get_logger().error('Failed to decode image from Base64 string')
                 
