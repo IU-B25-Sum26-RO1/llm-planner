@@ -42,7 +42,7 @@ TASK SCHEMA:
     "placement": {
         "reference": target,
         "relation": string
-    }
+    } | null,
 
     "modifiers": {
         "speed": string | null,
@@ -79,7 +79,8 @@ OBJECT SCHEMA:
         "shape": string | null,
         "material": string | null,
         "state": string | null
-    }
+    },
+    "prompt": string
 }
 ==================================================
 GENERAL RULES
@@ -421,6 +422,28 @@ Examples:
     }
 }
 
+
+==================================================
+OBJECT PROMPT
+==================================================
+
+The "prompt" field is used by the SAM3 model to detect and initialize object tracking on the video stream. To ensure segmentation runs without errors, strictly adhere to these rules:
+
+1. Describe ONLY visual and physical properties: Color, shape, material, and relative size (e.g., "red plastic cup", "shiny metal wrench", "striped ceramic mug"). Use object attributes.
+2. Language: Always write the value of the "prompt" field in ENGLISH, as the weights of SAM3 were trained on English-language datasets.
+
+Examples:
+
+Input: "Найди синюю кружку на столе"
+
+prompt: "blue mug"
+
+--------------------------------------------------
+
+Input: "Возьми самую близкую к тебе прозрачную бутылку, которая стоит справа от коробки"
+
+prompt: "transparent bottle"
+
 ==================================================
 SEARCH SPACE
 ==================================================
@@ -430,6 +453,10 @@ Search_space describe how to identify or locate the target object within the cur
 Search_space are used ONLY to help find or distinguish the target object.
 
 Search_space NEVER describe the result of an action.
+
+To be filled in ONLY when the user explicitly states the search location - for example, "на столе".
+
+NEVER generate search_space unless explicitly specified in the request. 
 
 Each search_space has the following structure:
 
@@ -453,19 +480,24 @@ next_to
 
 Examples
 
-"Возьми деталь со стола."
+"Возьми красную деталь со стола."
 
 ↓
 
 target:
 {
-    "class":"part",
+    "object": {
+        "class": "part",
+        "attributes": {...},
+        "prompt": "red part"
+    },
     "search_space":[
         {
             "relation":"on_top_of",
             "reference": { "class": "table", ... }
         }
-    ]
+    ],
+    ...
 }
 
 ----------------------------------------
@@ -476,13 +508,17 @@ target:
 
 target:
 {
-    "class":"cup",
+    "object": {
+        "class": "cup",
+        ...
+    },
     "search_space":[
         {
             "relation":"left_of",
             "reference": { "class": "bottle", ... }
         }
-    ]
+    ],
+    ...
 }
 
 ----------------------------------------
@@ -602,7 +638,8 @@ search_space:
     {
         "relation":"left_of",
         "reference":{
-            "class":"bottle"
+            "class":"bottle",
+            ...
         }
     }
 ]
@@ -620,7 +657,8 @@ search_space:
     {
         "relation":"near",
         "reference":{
-            "class":"bottle"
+            "class":"bottle",
+            ...
         }
     }
 ]
@@ -669,20 +707,21 @@ next_to
 
 Examples
 
-"Положи кружку на коробку."
+"Положи кружку на картонную коробку."
 
 ↓
 
 placement:
 {
     "relation":"on_top_of",
-    "reference":{
+    "reference": {
         "object": {
             "class": "box",
-            "attributes": {...}
+            "attributes": {...},
+            "prompt": "cardboard box" 
         },
         "search_space": [],
-        "selection": null 
+        "selection": null
     }
 }
 
@@ -698,12 +737,13 @@ placement:
     "reference":{
         "object": {
             "class": "box",
-            "attributes": {...}
+            "attributes": {...},
+            "prompt": "box"
         },
         "search_space": [],
         "selection": {
             "type": "leftmost"
-        } 
+        }
     }
 }
 
@@ -719,14 +759,16 @@ placement:
     "reference":{
         "object": {
             "class": "bottle",
-            "attributes": {...}
+            "attributes": {...},
+            "prompt": "bottle"
         },
         "search_space": [
             {
                 "relation": "on_top_of",
                 "reference": {
                     "class": "table",
-                    "attributes": {...}
+                    "attributes": {...},
+                    "prompt": "table"
                 }
             }
         ],
@@ -849,7 +891,8 @@ Output:
                         "shape": null,
                         "material": null,
                         "state": null
-                    }
+                    },
+                    "prompt": "lid"
                 }
                 "search_space": [],
                 "selection": {
@@ -875,7 +918,8 @@ Output:
                         "shape": null,
                         "material": null,
                         "state": null
-                    }
+                    },
+                    "prompt": "lid"
                 }
                 "search_space": [],
                 "selection": {
@@ -892,7 +936,8 @@ Output:
                             "shape": null,
                             "material": null,
                             "state": null
-                        }
+                        },
+                        "prompt": "red box"
                     },
                     "search_space": [],
                     "selection": null
@@ -949,7 +994,8 @@ Output:
                         "shape": null,
                         "material": null,
                         "state": null
-                    }
+                    },
+                    "prompt": "green ball"
                 }
                 "search_space": [
                     "relation": "on_top_of",
@@ -961,7 +1007,8 @@ Output:
                             "shape": null,
                             "material": glass,
                             "state": null
-                        }
+                        },
+                        "prompt": "glass table"
                     }
 
                 ],
@@ -986,7 +1033,8 @@ Output:
                         "shape": null,
                         "material": null,
                         "state": null
-                    }
+                    },
+                    "prompt": "green ball"
                 }
                 "search_space": [
                     "relation": "on_top_of",
@@ -998,7 +1046,8 @@ Output:
                             "shape": null,
                             "material": glass,
                             "state": null
-                        }
+                        },
+                        "prompt": "glass table"
                     }
 
                 ],
@@ -1014,7 +1063,8 @@ Output:
                             "shape": null,
                             "material": null,
                             "state": null
-                        }
+                        },
+                        "prompt": "box"
                     },
                     "search_space": [],
                     "selection": null
