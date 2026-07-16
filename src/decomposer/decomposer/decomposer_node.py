@@ -3,12 +3,15 @@ import threading
 import json
 import os
 import rclpy
+import secrets
 
 from rclpy.node import Node
 from std_msgs.msg import String
 
 from decomposer.llm_client import LLMClient
 from decomposer.sys_prompt_collector import get_system_prompt
+
+# from schemas.output_cmd import OutputCommandSchema, TaskSchema, TargetSchema, ObjectSchema
 
 class DecomposerNode(Node):
     def __init__(self):
@@ -41,7 +44,20 @@ class DecomposerNode(Node):
             logger=self.get_logger()
         )
 
-        self.json_publisher = self.create_publisher(String, '/decomposed_json', 10)
+        self.json_topic = '/decomposer/json_output/command'
+        self.task_topic = '/decomposer/json_output/task'
+        self.object_topic = '/decomposer/json_output/object'
+        self.target_topic = '/decomposer/json_output/target'
+
+        self.declare_parameter('json_topic', self.json_topic)
+        self.declare_parameter('task_topic', self.task_topic)
+        self.declare_parameter('object_topic', self.object_topic)
+        self.declare_parameter('target_topic', self.target_topic)
+
+        self.json_publisher = self.create_publisher(String, self.json_topic, 10)
+        self.task_publisher = self.create_publisher(String, self.task_topic, 20)
+        self.object_publisher = self.create_publisher(String, self.object_topic, 50)
+        self.target_publisher = self.create_publisher(String, self.target_topic, 30)
         self.text_subscriber = self.create_subscription(
             String, 
             '/recognized_text',
@@ -73,21 +89,83 @@ class DecomposerNode(Node):
     
     async def _async_decompose_and_publish(self, text: str):
         try:
+            self.get_logger().info("start decomposing...")
             result_dict = await self.llm_client.decompose(text)
-            json_string = json.dumps(result_dict, ensure_ascii=False)
-
-            out_msg = String()
-            out_msg.data = json_string
-            self.json_publisher.publish(out_msg)
-
-            self.get_logger().info(f"Successfully published JSON output to /decomposed_json:" + json_string)
+            self.identify_output(result_dict)
+            self.publish_cmd(result_dict)
         
         except Exception as e:
             self.get_logger().error(f"Failed to process or publish decomposition: {str(e)}")
+
+    def identify_output(self, cmd_obj):
+        cmd_obj["id"] = self.generate_prefixed_id("cmd")
+        for task in cmd_obj["tasks"]:
+            task["id"] = self.generate_prefixed_id("tsk")
+
+            placement = task.get("placement", None)
+            placement_target = None if placement is None else placement["reference"]
+            main_target = task["target"]
+
+            for target in (placement_target, main_target):
+                if target is None:
+                    continue
+                target["key"] = self.generate_prefixed_id("trg")
+                target["object"]["key"] = self.generate_prefixed_id("obj")
+                for space in target["search_space"]:
+                    space["reference"]["key"] = self.generate_prefixed_id("obj")
     
     def destroy_node(self):
         self.async_loop.call_soon_threadsafe(self.async_loop.stop)
         super().destroy_node()
+    
+    def publish_cmd(self, cmd_obj: dict):
+        self.get_logger().info(f"Published command: {cmd_obj['id']}")
+        json_string = json.dumps(cmd_obj, ensure_ascii=False)
+        out_msg = String()
+        out_msg.data = json_string
+        self.json_publisher.publish(out_msg)
+
+        for task in cmd_obj["tasks"]:
+            self.publish_task(task)
+
+    def publish_task(self, task: dict):
+        self.get_logger().info(f"Publishing task: {task['id']}")
+        task_string = json.dumps(task, ensure_ascii=False)
+        out_msg = String()
+        out_msg.data = task_string
+        self.task_publisher.publish(out_msg)
+
+        placement = task.get("placement", None)
+        placement_target = None if placement is None else placement["reference"]
+
+        if placement_target is not None:
+            self.publish_target(placement_target)
+        
+        main_target = task["target"]
+
+        if main_target is not None:
+            self.publish_target(main_target)
+
+    def publish_target(self, target: dict):
+        self.get_logger().info(f"Publishing target: {target['key']}")
+        target_string = json.dumps(target, ensure_ascii=False)
+        out_msg = String()
+        out_msg.data = target_string
+        self.target_publisher.publish(out_msg)
+
+    
+    def publish_object(self, obj: dict):
+        obj["key"] = self.generate_prefixed_id("obj")
+        self.get_logger().info(f"Published object: {obj['key']}")
+        obj_string = json.dumps(obj, ensure_ascii=False)
+        out_msg = String()
+        out_msg.data = obj_string
+        self.object_publisher.publish(out_msg)
+
+    
+    def generate_prefixed_id(self, prefix):
+        random_part = secrets.token_urlsafe(16)
+        return f"{prefix}_{random_part}"
 
 
 def main(args=None):
