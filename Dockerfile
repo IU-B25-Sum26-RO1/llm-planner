@@ -15,8 +15,6 @@ RUN apt-get update && apt-get install -y \
     libasound2-plugins \
     libportaudio2 \
     pulseaudio-utils \
-    nano \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -26,7 +24,9 @@ WORKDIR /workspace
 COPY pyproject.toml uv.lock ./
 
 RUN uv pip compile pyproject.toml -o requirements.txt && \
-    uv pip sync requirements.txt --system
+    uv pip sync requirements.txt --system 
+
+COPY ./prompts ./prompts
 
 COPY ./src ./src
 

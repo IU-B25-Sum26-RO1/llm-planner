@@ -1,13 +1,15 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>decomposer</name>
+  <name>sam3_bridge</name>
   <version>0.0.0</version>
-  <description>ROS2 Package for text decomposition using LLM</description>
-  <maintainer email="idfc1200@gmail.com">Aioma</maintainer>
-  <license>Apache-2.0</license>
+  <description>TODO: Package description</description>
+  <maintainer email="idfc1200@gmail.com">idfc1</maintainer>
+  <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
   <depend>std_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>

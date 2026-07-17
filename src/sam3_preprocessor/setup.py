@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'decomposer'
+package_name = 'sam3_preprocessor'
 
 setup(
     name=package_name,
@@ -14,10 +14,9 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Aioma',
-    maintainer_email='idfc1@gmail.com',
-    description='ROS2 Package for text decomposition using LLM',
+    maintainer_email='idfc1200@gmail.com',
+    description='TODO: Package description',
     license='Apache-2.0',
-    tests_require=['pytest'],
     extras_require={
         'test': [
             'pytest',
@@ -25,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'decomposer = decomposer.decomposer_node:main',
+            'preprocessor = sam3_preprocessor.preprocessor_node:main'
         ],
     },
 )

@@ -30,7 +30,7 @@ class AudioProcessorNode(Node):
         self.async_loop = asyncio.new_event_loop()
         self.is_running = True
 
-        self.recorder = Recorder(loop=self.async_loop, samplerate=samplerate, blocksize=blocksize)
+        self.recorder = Recorder(loop=self.async_loop, samplerate=samplerate, blocksize=blocksize, logger=self.get_logger())
         self.recognizer = Recognizer(model_path=model_path, samplerate=samplerate)
 
         self.recorder.start_recording()

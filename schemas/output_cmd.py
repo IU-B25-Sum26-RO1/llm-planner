@@ -65,6 +65,7 @@ class ObjectAttributes(BaseModel):
 class ObjectSchema(BaseModel):
     object_class: str = Field(..., alias="class", description="Object class or type. Normalized object name. Canonical English singular noun.")
     attributes: ObjectAttributes
+    prompt: str = Field(..., description="SAM3 Search Prompt")
 
 
 class SearchSpaceItem(BaseModel):

@@ -1,0 +1,10 @@
+string task_type
+string object_name
+float64 x
+float64 y
+float64 z
+---
+bool success
+string error_message
+---
+string current_state

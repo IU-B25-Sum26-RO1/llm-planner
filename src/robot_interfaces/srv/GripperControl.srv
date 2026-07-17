@@ -1,0 +1,3 @@
+bool activate  # true - close gripper, false - open gripper 
+---
+bool success

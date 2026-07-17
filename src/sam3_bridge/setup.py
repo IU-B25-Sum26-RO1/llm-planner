@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'decomposer'
+package_name = 'sam3_bridge'
 
 setup(
     name=package_name,
@@ -13,11 +13,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='Aioma',
-    maintainer_email='idfc1@gmail.com',
-    description='ROS2 Package for text decomposition using LLM',
-    license='Apache-2.0',
-    tests_require=['pytest'],
+    maintainer='idfc1',
+    maintainer_email='idfc1200@gmail.com',
+    description='TODO: Package description',
+    license='TODO: License declaration',
     extras_require={
         'test': [
             'pytest',
@@ -25,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'decomposer = decomposer.decomposer_node:main',
+            'bridge = sam3_bridge.sam3_bridge_node:main'
         ],
     },
 )
