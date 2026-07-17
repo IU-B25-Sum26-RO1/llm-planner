@@ -197,17 +197,17 @@ SUPPORTED ACTIONS
 
 Use only one of these canonical actions:
 
-pick_object
-place_object
+pick
+place
 move_to
-find_object
-inspect_object
-follow_object
+find
+inspect
+follow
 open_gripper
 close_gripper
-rotate_object
-push_object
-pull_object
+rotate
+push
+pull
 press_button
 go_home
 stop
@@ -784,13 +784,13 @@ It MUST NOT be used to identify the target object.
 
 Placement is typically used by actions such as:
 
-place_object
+place
 
 move_to
 
-push_object
+push
 
-pull_object
+pull
 
 Placement is null for actions that do not specify a destination.
 
