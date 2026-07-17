@@ -20,7 +20,7 @@ class DecomposerNode(Node):
         env_url = os.environ.get('LLM_API_URL')
         env_key = os.environ.get('LLM_API_KEY')
         env_model = os.environ.get('LLM_MODEL')
-        env_sys_prompt_file_path = os.environ.get('SYS_PROMPT_PATH')
+        env_sys_prompt_file_path = os.environ.get('SYS_PROMPT_PATH', '')
 
         system_prompt = get_system_prompt(env_sys_prompt_file_path, logger=self.get_logger())
 
