@@ -33,10 +33,11 @@ class UR10eInterface(Node):
         pass
 
     def cancel_callback(self, cancel_request):
+        # Тут мы тупо принимаем запрос на отмену
         self.get_logger().warn('UR10e Interface | Got emergency cancel command.')
         return CancelResponse.ACCEPT
 
-    def execute_callback(self, goal_handle) -> dict:
+    def execute_callback(self, goal_handle):
         """
         Executes received action
         Parameters:
@@ -48,6 +49,18 @@ class UR10eInterface(Node):
         """
         request = goal_handle.request
         task = request.task_type # string: pick | place | move_to
+
+        # TODO: также реализовать проверку на возможную отмену 
+        if goal_handle.is_cancel_requested:
+            # Остановка робота
+
+            goal_handle.canceled()
+            self.is_busy = False
+
+            self.get_logger().info("UR10e Interface | Robot stopped.")
+            result = BaseAction.Result()
+            result.success = False
+            return result 
 
         if task == "pick":
             self._pick(...)
