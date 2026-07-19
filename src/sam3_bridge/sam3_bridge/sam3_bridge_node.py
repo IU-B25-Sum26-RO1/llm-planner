@@ -19,10 +19,13 @@ class SAM3BridgeNode(Node):
     def __init__(self):
         super().__init__('sam3_bridge_node')
         
-        image_sub_topic = 'camera/color/image_raw/processed'
-        target_sub_topic = '/decomposer/json_output/target'
+        self.image_sub_topic = 'camera/color/image_raw/processed'
+        self.target_sub_topic = '/decomposer/json_output/target'
+        self.raw_mask_pub_topic = '/sam3/output/mask_raw'
 
-        raw_mask_pub_topic = '/sam3/output/mask_raw'
+        self.declare_parameter('image_sub_topic', self.image_sub_topic)
+        self.declare_parameter('target_sub_topic', self.target_sub_topic)
+        self.declare_parameter('raw_mask_pub_topic', self.raw_mask_pub_topic)
 
         env_server_url = os.environ.get('SAM3_SERVER_URL')
         self.declare_parameter('server_url', env_server_url)
@@ -30,20 +33,20 @@ class SAM3BridgeNode(Node):
 
         self.image_sub = self.create_subscription(
             CompressedImage,
-            image_sub_topic,
+            self.image_sub_topic,
             self.image_callback,
             1
         )
 
         self.target_sub = self.create_subscription(
             String,
-            target_sub_topic,
+            self.target_sub_topic,
             self.target_callback,
             10
         )
 
         self.raw_mask_pub = self.create_publisher(
-            Image, raw_mask_pub_topic, 3
+            Image, self.raw_mask_pub_topic, 3
         )
 
         self.bridge = CvBridge()
@@ -85,7 +88,7 @@ class SAM3BridgeNode(Node):
     
     def target_callback(self, msg: String):
         if self.target_queue is None:
-            self.get_logger().warn("Prompt queue is not initialized yet. Dropping target")
+            self.get_logger().warn("Target queue is not initialized yet. Dropping target")
             return
         
         try:
