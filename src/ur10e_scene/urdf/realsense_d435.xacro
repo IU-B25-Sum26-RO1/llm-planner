@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:property name="cam_fps" value="$(env TARGET_VIDEO_FPS)" />
-  <xacro:property name="cam_width" value="$(env TARGET_VIDEO_WIDTH)" />
-  <xacro:property name="cam_height" value="$(env TARGET_VIDEO_HEIGHT)" />
+  <xacro:property name="cam_fps" value="$(optenv TARGET_VIDEO_FPS 30)" />
+  <xacro:property name="cam_width" value="$(optenv TARGET_VIDEO_WIDTH 640)" />
+  <xacro:property name="cam_height" value="$(optenv TARGET_VIDEO_HEIGHT 480)" />
 
   <xacro:macro name="realsense_d435" params="parent *origin">
     

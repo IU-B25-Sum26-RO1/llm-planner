@@ -3,13 +3,19 @@
 <package format="3">
   <name>ur10e_control_system</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Basic manipulation policies for the anchored UR10e in Gazebo (move, directional jog, grasp/release, pick/place) with URDF-based inverse kinematics.</description>
   <maintainer email="idfc1200@gmail.com">idfc1</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>robot_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>gazebo_msgs</depend>
+  <exec_depend>urdfdom_py</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

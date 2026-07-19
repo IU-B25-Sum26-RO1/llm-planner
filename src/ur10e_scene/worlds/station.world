@@ -5,6 +5,13 @@
     <include><uri>model://sun</uri></include>
     <include><uri>model://ground_plane</uri></include>
 
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/gazebo</namespace>
+      </ros>
+      <update_rate>20.0</update_rate>
+    </plugin>
+
     <model name="table">
       <static>true</static>
       <pose>0 0 0 0 0 0</pose>
@@ -37,8 +44,22 @@
     <model name="green_cube">
       <pose>0.3 0.2 0.825 0 0 0</pose>
       <link name="link">
-        <inertial><mass>0.05</mass></inertial>
-        <collision name="collision"><geometry><box><size>0.05 0.05 0.05</size></box></geometry></collision>
+        <inertial>
+          <mass>0.05</mass>
+          <inertia>
+            <ixx>2.1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>2.1e-5</iyy><iyz>0</iyz><izz>2.1e-5</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <surface>
+            <friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction>
+            <contact>
+              <ode><kp>10000.0</kp><kd>10.0</kd><max_vel>0.0</max_vel><min_depth>0.002</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
         <visual name="visual">
           <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
           <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Green</name></script></material>
@@ -49,7 +70,13 @@
     <model name="white_tray">
       <pose>0.3 -0.2 0.8 0 0 0</pose>
       <link name="link">
-        <inertial><mass>0.15</mass></inertial>
+        <inertial>
+          <mass>0.15</mass>
+          <inertia>
+            <ixx>2.1e-4</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>2.1e-4</iyy><iyz>0</iyz><izz>3.6e-4</izz>
+          </inertia>
+        </inertial>
         
         <collision name="bottom_col"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry></collision>
         <visual name="bottom_vis"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
