@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     ros-humble-ur \
     ros-humble-gazebo-ros2-control \
     ros-humble-ros2-controllers \
+    ros-humble-moveit \
+    ros-humble-moveit-ros-move-group \
+    ros-humble-moveit-planners-ompl \
+    ros-humble-ur-moveit-config \
     python3-colcon-common-extensions \
     curl \
     libasound2-dev \
