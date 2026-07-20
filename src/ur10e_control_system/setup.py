@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'ur10e_interface = ur10e_control_system.robot_interface_node:main',
             'cli = ur10e_control_system.cli:main',
+            'task_manager = ur10e_control_system.task_manager_node:main'
         ],
     },
 )
