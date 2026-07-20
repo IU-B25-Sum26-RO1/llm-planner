@@ -92,6 +92,8 @@ class DecomposerNode(Node):
     async def _async_decompose_and_publish(self, text: str):
         try:
             result_dict = await self.llm_client.decompose(text)
+            if result_dict["type"] == "non_command":
+                return
             self._parse_and_identify(result_dict)
             self.publish_cmd(result_dict)
         
