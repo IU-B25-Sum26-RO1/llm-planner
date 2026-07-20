@@ -30,8 +30,6 @@ COPY pyproject.toml uv.lock ./
 RUN uv pip compile pyproject.toml -o requirements.txt && \
     uv pip sync requirements.txt --system 
 
-COPY ./prompts ./prompts
-
 COPY ./src ./src
 
 RUN source /opt/ros/humble/setup.bash && colcon build --symlink-install
