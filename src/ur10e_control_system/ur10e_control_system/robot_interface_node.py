@@ -429,7 +429,7 @@ class UR10eInterface(Node):
         hover = np.array([obj[0], obj[1], obj[2] + self.hover_height])
         grasp = np.array([obj[0], obj[1], obj[2] + self.grasp_height])
         self._command_gripper(closed=False)
-        self._go_home()
+        # self._go_home()
         ok, msg = self._move_tool_to(hover)
         if not ok:
             return ok, msg
@@ -505,7 +505,7 @@ class UR10eInterface(Node):
         self._publish_feedback(goal_handle, f"running:{task}")
 
         try:
-            if task == "home":
+            if task == "go_home":
                 ok, msg = self._go_home()
             elif task == "move_to":
                 ok, msg = self._move_to([request.x, request.y, request.z])
@@ -520,14 +520,14 @@ class UR10eInterface(Node):
                 ok, msg = self._place(request.object_name, position)
             elif task in DIRECTION_VECTORS:
                 ok, msg = self._jog(task, request.x)
-            elif task == "grasp":
-                self._command_gripper(closed=True)
-                self._attach_nearest()
-                ok, msg = True, ""
-            elif task == "release":
-                self._detach()
-                self._command_gripper(closed=False)
-                ok, msg = True, ""
+            # elif task == "close_gripper":  # Not using now 
+            #     self._command_gripper(closed=True)
+            #     self._attach_nearest()
+            #     ok, msg = True, ""
+            # elif task == "open_gripper":
+            #     self._detach()
+            #     self._command_gripper(closed=False)
+            #     ok, msg = True, ""
             else:
                 ok, msg = False, f"Unexpected task: {task}"
                 self.get_logger().warn(f"UR10e Interface | {msg}")
@@ -557,6 +557,10 @@ class UR10eInterface(Node):
 
     def gripper_callback(self, request, response):
         try:
+            if request.activate:
+                self._attach_nearest(max_dist=0.03)
+            else:
+                self._detach()
             self._command_gripper(closed=bool(request.activate))
         except Exception as exc:  # pragma: no cover - defensive
             self.get_logger().error(f"UR10e Interface | Unexpected gripper error: {exc}")
