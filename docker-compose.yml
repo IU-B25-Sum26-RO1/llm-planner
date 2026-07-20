@@ -54,6 +54,7 @@ services:
       - /dev/shm:/dev/shm
       - ./src:/workspace/src
       - ./schemas:/workspace/schemas
+      - ./prompts:/workspace/prompts
     command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run decomposer decomposer"
     restart: unless-stopped
 
@@ -61,9 +62,7 @@ services:
   simulation:
     image: llm_planner_image:latest
     container_name: simulation_container
-    depends_on:
-      - audio_processor
-    
+
     devices:
       - /dev/dxg:/dev/dxg
 
@@ -91,7 +90,7 @@ services:
     image: llm_planner_image:latest
     container_name: sam3_preprocessor_container
     depends_on:
-      - audio_processor
+      - simulation
     
     network_mode: "host"
     ipc: host
@@ -112,7 +111,7 @@ services:
     image: llm_planner_image:latest
     container_name: sam3_bridge_container
     depends_on:
-      - audio_processor
+      - sam3_preprocessor
     
     network_mode: "host"
     ipc: host
@@ -125,3 +124,21 @@ services:
       - ./src:/workspace/src
 
     command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run sam3_bridge bridge"
+
+  ur10e_control:
+    image: llm_planner_image:latest
+    container_name: control_container
+    depends_on:
+      - audio_processor
+      - decomposer
+      - simulation
+    
+    network_mode: "host"
+    ipc: host
+
+    volumes:
+      - /dev/shm:/dev/shm
+      - ./src:/workspace/src
+
+    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run ur10e_control_system task_manager && ros2 run ur10e_control_system ur10e_interface"
+

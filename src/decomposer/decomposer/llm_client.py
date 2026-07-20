@@ -1,5 +1,6 @@
 import httpx
 import json
+import time
 import traceback
 from openai import AsyncOpenAI
 
@@ -33,6 +34,7 @@ class LLMClient:
         self.logger.info("LLM Client | Calling LLM...")
 
         try:
+            start_time = time.time()
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -41,7 +43,9 @@ class LLMClient:
                 ],
                 temperature=temperature,
             )
-            self.logger.info(f"LLM response: {response.choices[0].message.content}")
+            end_time = time.time()
+            # self.logger.info(f"LLM response: {response.choices[0].message.content}\nLatency: {(end_time - start_time):.2f} s")
+            self.logger.info(f"LLM Client | Response latency: {(end_time - start_time):.2f} s")
             return json.loads(response.choices[0].message.content)
         
         except Exception as e:

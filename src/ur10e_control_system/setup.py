@@ -15,7 +15,8 @@ setup(
     zip_safe=True,
     maintainer='idfc1',
     maintainer_email='idfc1200@gmail.com',
-    description='TODO: Package description',
+    description='Basic manipulation policies for the anchored UR10e in Gazebo '
+                '(move, directional jog, grasp/release, pick/place) with URDF-based IK.',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -24,6 +25,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'ur10e_interface = ur10e_control_system.robot_interface_node:main',
+            'cli = ur10e_control_system.cli:main',
+            'task_manager = ur10e_control_system.task_manager_node:main'
         ],
     },
 )

@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     ros-humble-ur \
     ros-humble-gazebo-ros2-control \
     ros-humble-ros2-controllers \
+    ros-humble-moveit \
+    ros-humble-moveit-ros-move-group \
+    ros-humble-moveit-planners-ompl \
+    ros-humble-ur-moveit-config \
     python3-colcon-common-extensions \
     curl \
     libasound2-dev \
@@ -25,8 +29,6 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv pip compile pyproject.toml -o requirements.txt && \
     uv pip sync requirements.txt --system 
-
-COPY ./prompts ./prompts
 
 COPY ./src ./src
 
