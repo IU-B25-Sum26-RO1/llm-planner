@@ -54,6 +54,7 @@ services:
       - /dev/shm:/dev/shm
       - ./src:/workspace/src
       - ./schemas:/workspace/schemas
+      - ./prompts:/workspace/prompts
     command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 run decomposer decomposer"
     restart: unless-stopped
 
@@ -130,6 +131,7 @@ services:
     depends_on:
       - audio_processor
       - decomposer
+      - simulation
     
     network_mode: "host"
     ipc: host
