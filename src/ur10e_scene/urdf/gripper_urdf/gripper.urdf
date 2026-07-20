@@ -78,7 +78,7 @@
     <child link="left_jaw_link"/>
     <origin xyz="-0.04488 0.000189 0.09354972" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
-    <limit lower="0" upper="0.068" effort="120" velocity="0.05"/>
+    <limit lower="0" upper="0.068" effort="35" velocity="0.03"/>
     <dynamics damping="8" friction="1"/>
   </joint>
 
@@ -87,20 +87,26 @@
     <child link="right_jaw_link"/>
     <origin xyz="0.04488 0.000189 0.09354972" rpy="0 0 0"/>
     <axis xyz="-1 0 0"/>
-    <limit lower="0" upper="0.068" effort="120" velocity="0.05"/>
+    <limit lower="0" upper="0.068" effort="35" velocity="0.03"/>
     <dynamics damping="8" friction="1"/>
-    <mimic joint="left_jaw_joint" multiplier="1" offset="0"/>
   </joint>
 
-  <transmission name="left_jaw_transmission">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="left_jaw_joint">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="linear_actuator">
-      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
+  <gazebo reference="left_jaw_link">
+    <mu1>3.0</mu1>
+    <mu2>3.0</mu2>
+    <kp>10000.0</kp>
+    <kd>10.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>0.0</maxVel>
+  </gazebo>
+  <gazebo reference="right_jaw_link">
+    <mu1>3.0</mu1>
+    <mu2>3.0</mu2>
+    <kp>10000.0</kp>
+    <kd>10.0</kd>
+    <minDepth>0.002</minDepth>
+    <maxVel>0.0</maxVel>
+  </gazebo>
+
 </robot>
 

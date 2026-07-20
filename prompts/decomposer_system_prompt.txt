@@ -124,6 +124,10 @@ Examples:
 
 "Подойди ближе."
 
+"Стоп."
+
+"Стой, остановись"
+
 ------------------------------------
 
 type = "non_command"
@@ -197,22 +201,16 @@ SUPPORTED ACTIONS
 
 Use only one of these canonical actions:
 
-pick
-place
-move_to
-find
-inspect
-follow
-open_gripper
-close_gripper
-rotate
-push
-pull
-press_button
-go_home
-stop
-cancel
+pick ("Возьми", "Подбери", "Захвати")
+place ("Положи")
+move_to ("Передвинься")
+open_gripper ("Отпусти [object_name]", "Разожми захват", "Отпусти")
+close_gripper ("Зажми захват", "Зажми гриппер")
+go_home ("Домой", "Вернись домой")
+stop ("Стоп", "Стой", "Остановись", "Отмена")
 unknown
+
+Parentheses indicate which words most often imply this action.
 
 ==================================================
 MULTIPLE ACTIONS
@@ -1079,5 +1077,82 @@ Output:
         }
     ],
     "text": "Положи зеленый шарик со стеклянного стола в коробку.",
+    "confidence": 0.97
+}
+
+--------------------------------------------------
+
+Input:
+
+"Положи зеленый шарик со стеклянного стола в коробку."
+
+Output:
+{
+    "type": "command",
+    "language": "ru",
+    "tasks": [
+        {
+            "action": "go_home",
+            "target": null,
+            "placement": null,
+            "modifiers": {
+                "speed": null,
+                "precision": null
+            },
+            "confidence": 0.98
+        },
+        {
+            "action": "pick",
+            "target": {
+                "object": {
+                    "class": "cube",
+                    "attributes": {
+                        "color": "green",
+                        "size": null,
+                        "shape": null,
+                        "material": null,
+                        "state": null
+                    },
+                    "prompt": "green cube"
+                },
+                "search_space": [],
+                "selection": null
+            },
+            "placement": null,
+            "modifiers": {
+                "speed": null,
+                "precision": null
+            },
+            "confidence": 0.98
+        }
+    ],
+    "text": "Так, заново. Вернись домой, затем возьми этот зеленый куб",
+    "confidence": 0.97
+}
+
+--------------------------------------------------
+
+Input:
+
+"Стой" / "Стой" / "Остановись"
+
+Output:
+
+{
+    "type": "command",
+    "language": "ru",
+    "tasks": [
+        {
+            "action": "stop",
+            "target": null,
+            "placement": null,
+            "modifiers": {
+                "speed": null,
+                "precision": null
+            },
+            "confidence": 0.98
+        }
+    ],
+    "text": "Стой" / "Стой" / "Остановись",
     "confidence": 0.97
 }

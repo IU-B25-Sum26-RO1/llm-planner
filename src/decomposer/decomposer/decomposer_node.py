@@ -64,6 +64,8 @@ class DecomposerNode(Node):
             self.text_callback,
             10
         )
+
+        self.objects = {} # object key -> object
         
         self.async_loop = asyncio.new_event_loop()
         self.worker_thread = threading.Thread(target=self._start_async_loop, daemon=True)
@@ -89,15 +91,17 @@ class DecomposerNode(Node):
     
     async def _async_decompose_and_publish(self, text: str):
         try:
-            self.get_logger().info("start decomposing...")
             result_dict = await self.llm_client.decompose(text)
-            self.identify_output(result_dict)
+            if result_dict["type"] == "non_command":
+                return
+            self._parse_and_identify(result_dict)
             self.publish_cmd(result_dict)
         
         except Exception as e:
             self.get_logger().error(f"Failed to process or publish decomposition: {str(e)}")
 
-    def identify_output(self, cmd_obj):
+    def _parse_and_identify(self, cmd_obj):
+        """ Parses command_object and assign if for each object and task. """
         cmd_obj["id"] = self.generate_prefixed_id("cmd")
         for task in cmd_obj["tasks"]:
             task["id"] = self.generate_prefixed_id("tsk")
@@ -109,10 +113,55 @@ class DecomposerNode(Node):
             for target in (placement_target, main_target):
                 if target is None:
                     continue
+
                 target["key"] = self.generate_prefixed_id("trg")
-                target["object"]["key"] = self.generate_prefixed_id("obj")
+
+                objects = []
+                objects.append(target["object"])
+                
                 for space in target["search_space"]:
-                    space["reference"]["key"] = self.generate_prefixed_id("obj")
+                    objects.append(space["reference"])
+                
+                for obj in objects:
+                    self._resolve_object_key(obj)
+    
+    def _resolve_object_key(self, obj: dict) -> str:
+        """ Resolving object duplicating problem. Updating existing objects info.
+
+        Args:
+            obj (`dict`): Object (see schemas/output_cmd.py).
+
+        Returns: 
+            Unique object key (existing or new) (`str`).
+        """
+        for existing_obj in self.objects.values():
+            if existing_obj["class"] != obj["class"]:
+                continue
+
+            has_contradiction = False
+            for key, new_val in obj["attributes"].items():
+                existing_val = existing_obj["attributes"].get(key)
+
+                if existing_val is not None and new_val is not None and existing_val != new_val:
+                    has_contradiction = True
+                    break
+
+            if not has_contradiction:
+                for key, new_val in obj["attributes"].items():
+                    if key in ("color", "material", "shape", "size"):
+                        if existing_obj["attributes"].get(key) is None and new_val is not None:
+                            existing_obj["attributes"][key] = new_val 
+                return existing_obj["key"]
+            
+        new_key = self.generate_prefixed_id("obj")
+        self.objects[new_key] = {
+            "key": new_key,
+            "class": obj["class"],
+            "attributes": obj["attributes"].copy()
+        }
+
+        return new_key
+
     
     def destroy_node(self):
         self.async_loop.call_soon_threadsafe(self.async_loop.stop)
@@ -161,7 +210,6 @@ class DecomposerNode(Node):
         out_msg = String()
         out_msg.data = obj_string
         self.object_publisher.publish(out_msg)
-
     
     def generate_prefixed_id(self, prefix):
         random_part = secrets.token_urlsafe(16)
