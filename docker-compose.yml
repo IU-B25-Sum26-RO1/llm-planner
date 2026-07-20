@@ -4,8 +4,8 @@ services:
     image: llm_planner_image:latest
     container_name: audio_processor_container
 
-    devices:
-      - /dev/snd:/dev/snd
+    # devices:
+    #   - /dev/snd:/dev/snd
 
     network_mode: "host"
     ipc: host

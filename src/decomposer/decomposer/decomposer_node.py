@@ -92,11 +92,30 @@ class DecomposerNode(Node):
     async def _async_decompose_and_publish(self, text: str):
         try:
             result_dict = await self.llm_client.decompose(text)
-            if result_dict["type"] == "non_command":
+<<<<<<< Updated upstream
+            self.identify_output(result_dict)
+=======
+
+            if "error" in result_dict:
+                self.get_logger().error(
+                    f"LLM decomposition failed for '{text}': {result_dict['error']}"
+                )
                 return
+
+            if result_dict.get("type") == "non_command":
+                self.get_logger().info(f"Ignored non-command utterance: '{text}'")
+                return
+
+            if result_dict.get("type") != "command":
+                self.get_logger().warning(
+                    f"Unexpected command type '{result_dict.get('type')}' for '{text}'"
+                )
+                return
+
             self._parse_and_identify(result_dict)
+>>>>>>> Stashed changes
             self.publish_cmd(result_dict)
-        
+
         except Exception as e:
             self.get_logger().error(f"Failed to process or publish decomposition: {str(e)}")
 

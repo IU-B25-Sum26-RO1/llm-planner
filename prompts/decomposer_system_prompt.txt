@@ -175,7 +175,7 @@ When type is "non_command", return:
 
 {
     "type":"non_command",
-    "language": "<original utterance>",
+    "language": "ru",
     "tasks": [],
     "text":"<original utterance>",
     "confidence":0.xx
@@ -860,7 +860,7 @@ UNKNOWN
 If Action cannot be determined:
 
 {
-    "Action":"unknown",
+    "action":"unknown",
     ...
 }
 
@@ -891,10 +891,10 @@ Output:
                         "state": null
                     },
                     "prompt": "lid"
-                }
+                },
                 "search_space": [],
                 "selection": {
-                    "type":"leftmost"
+                    "type": "leftmost"
                 }
             },
             "placement": null,
@@ -904,7 +904,6 @@ Output:
             },
             "confidence": 0.98
         },
-
         {
             "action": "place",
             "target": {
@@ -918,15 +917,15 @@ Output:
                         "state": null
                     },
                     "prompt": "lid"
-                }
+                },
                 "search_space": [],
                 "selection": {
-                    "type":"leftmost"
+                    "type": "leftmost"
                 }
             },
             "placement": {
                 "reference": {
-                    "object" {
+                    "object": {
                         "class": "box",
                         "attributes": {
                             "color": "red",
@@ -946,7 +945,7 @@ Output:
                 "speed": null,
                 "precision": null
             },
-            "confidence":0.98
+            "confidence": 0.98
         }
     ],
     "text": "Возьми самую левую крышку и поставь её на красную коробку.",
@@ -987,28 +986,29 @@ Output:
                 "object": {
                     "class": "ball",
                     "attributes": {
-                        "color": green,
+                        "color": "green",
                         "size": null,
                         "shape": null,
                         "material": null,
                         "state": null
                     },
                     "prompt": "green ball"
-                }
+                },
                 "search_space": [
-                    "relation": "on_top_of",
-                    "reference": {
-                        "class": "table",
-                        "attributes": {
-                            "color": null,
-                            "size": null,
-                            "shape": null,
-                            "material": glass,
-                            "state": null
-                        },
-                        "prompt": "glass table"
+                    {
+                        "relation": "on_top_of",
+                        "reference": {
+                            "class": "table",
+                            "attributes": {
+                                "color": null,
+                                "size": null,
+                                "shape": null,
+                                "material": "glass",
+                                "state": null
+                            },
+                            "prompt": "glass table"
+                        }
                     }
-
                 ],
                 "selection": null
             },
@@ -1019,7 +1019,6 @@ Output:
             },
             "confidence": 0.98
         },
-
         {
             "action": "place",
             "target": {
@@ -1033,27 +1032,13 @@ Output:
                         "state": null
                     },
                     "prompt": "green ball"
-                }
-                "search_space": [
-                    "relation": "on_top_of",
-                    "reference": {
-                        "class": "table",
-                        "attributes": {
-                            "color": null,
-                            "size": null,
-                            "shape": null,
-                            "material": glass,
-                            "state": null
-                        },
-                        "prompt": "glass table"
-                    }
-
-                ],
+                },
+                "search_space": [],
                 "selection": null
             },
             "placement": {
                 "reference": {
-                    "object" {
+                    "object": {
                         "class": "box",
                         "attributes": {
                             "color": null,
@@ -1073,18 +1058,21 @@ Output:
                 "speed": null,
                 "precision": null
             },
-            "confidence":0.98
+            "confidence": 0.98
         }
     ],
     "text": "Положи зеленый шарик со стеклянного стола в коробку.",
     "confidence": 0.97
+<<<<<<< Updated upstream
+}
+=======
 }
 
 --------------------------------------------------
 
 Input:
 
-"Положи зеленый шарик со стеклянного стола в коробку."
+Так, заново. Вернись домой, затем возьми этот зеленый куб
 
 Output:
 {
@@ -1156,3 +1144,4 @@ Output:
     "text": "Стой" / "Стой" / "Остановись",
     "confidence": 0.97
 }
+>>>>>>> Stashed changes
