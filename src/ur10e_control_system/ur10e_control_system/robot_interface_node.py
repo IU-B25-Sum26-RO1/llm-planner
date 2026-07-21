@@ -300,8 +300,9 @@ class UR10eInterface(Node):
             )
             return False
         # Record the object position relative to the tool frame at grasp time.
-        self._held_offset = tool[:3, :3].T @ (obj - tool[:3, 3])
-        self._held = name
+        with self._lock:
+            self._held_offset = tool[:3, :3].T @ (obj - tool[:3, 3])
+            self._held = name
         # Back the jaws slightly off the object so contact does not fight the
         # kinematic hold (removes residual jitter while carrying).
         self._gripper_cmd = [self.gripper_hold, self.gripper_hold]
@@ -331,12 +332,17 @@ class UR10eInterface(Node):
         return False
 
     def _detach(self):
-        if self._held is not None:
-            self.get_logger().info(f"UR10e Interface | Detached '{self._held}'")
-        self._held = None
+        with self._lock:
+            held = self._held
+            self._held = None
+        if held is not None:
+            self.get_logger().info(f"UR10e Interface | Detached '{held}'")
 
     def _follow_held(self):
-        if self._held is None or self.kin is None:
+        with self._lock:
+            held = self._held
+            held_offset = self._held_offset.copy()
+        if held is None or self.kin is None:
             return
         tool = self._tool_pose()
         if tool is None or not self._set_state_cli.service_is_ready():
@@ -344,9 +350,9 @@ class UR10eInterface(Node):
         # Skip if the previous call has not completed yet (avoid piling up).
         if self._set_future is not None and not self._set_future.done():
             return
-        world_pos = tool[:3, 3] + tool[:3, :3] @ self._held_offset
+        world_pos = tool[:3, 3] + tool[:3, :3] @ held_offset
         state = EntityState()
-        state.name = self._held
+        state.name = held
         state.pose.position.x = float(world_pos[0])
         state.pose.position.y = float(world_pos[1])
         state.pose.position.z = float(world_pos[2])
