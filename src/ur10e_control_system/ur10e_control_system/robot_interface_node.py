@@ -1,26 +1,3 @@
-"""UR10e robot interface node.
-
-Exposes a small set of *basic policies* for the anchored UR10e in Gazebo and
-wires them to the ``/execute/base_action`` action and ``/execute/gripper_control``
-service defined in ``robot_interfaces``.
-
-Supported ``task_type`` values (see :meth:`UR10eInterface.execute_callback`):
-
-* ``move_to``        - move the tool to a world (x, y, z) point, gripper down.
-* ``move_to_object`` - look up ``object_name`` pose in Gazebo, hover above it.
-* ``pick``           - hover -> descend -> close gripper -> lift.
-* ``place``          - hover over target -> descend -> open gripper -> lift.
-* ``home``           - go to the predefined ready posture.
-* ``forward`` / ``backward`` / ``left`` / ``right`` / ``up`` / ``down`` -
-  Cartesian jog of the tool by a fixed step (world frame). Optional custom
-  distance can be passed through the ``x`` field of the goal.
-* ``grasp`` / ``release`` - close / open the gripper.
-
-Directions are expressed in the Gazebo *world* frame:
-``forward`` = +X, ``backward`` = -X, ``left`` = +Y, ``right`` = -Y,
-``up`` = +Z, ``down`` = -Z.
-"""
-
 import math
 import threading
 import time
@@ -45,7 +22,6 @@ from robot_interfaces.srv import GripperControl  # type: ignore
 from ur10e_control_system.ur_kinematics import URKinematics, make_transform
 
 
-# Order expected by joint_trajectory_controller (see ur10e_scene/config/controllers.yaml).
 ARM_JOINTS = [
     "shoulder_pan_joint",
     "shoulder_lift_joint",
@@ -55,8 +31,6 @@ ARM_JOINTS = [
     "wrist_3_joint",
 ]
 
-# Ready posture: elbow up, tool pointing down over the table. Used as a safe
-# starting configuration and as an IK seed.
 HOME_POSITION = {
     "shoulder_pan_joint": 0.0,
     "shoulder_lift_joint": -1.2,
@@ -66,7 +40,6 @@ HOME_POSITION = {
     "wrist_3_joint": 0.0,
 }
 
-# Tool pointing straight down (tool0 Z axis -> world -Z), used for top-down grasps.
 DOWN_ORIENTATION = np.array([
     [1.0, 0.0, 0.0],
     [0.0, -1.0, 0.0],
@@ -87,18 +60,14 @@ class UR10eInterface(Node):
     def __init__(self):
         super().__init__("ur10e_interface")
 
-        # ---- Tunable parameters ---------------------------------------------
-        self.declare_parameter("hover_height", 0.25)      # tool height above object top
-        self.declare_parameter("grasp_height", 0.135)     # tool height for closing on object (grip face centers)
-        self.declare_parameter("place_height", 0.24)      # tool height when releasing into a tray
-        self.declare_parameter("jog_step", 0.05)          # default Cartesian jog (m)
-        # Gripper jaw positions. Two-finger grasping of a rigid body is unstable
-        # in Gazebo Classic (ODE), so the jaws only provide the visual grasp while
-        # the object is actually held by a kinematic attach (see _attach).
-        self.declare_parameter("gripper_open", 0.0)       # jaw position, open
-        self.declare_parameter("gripper_closed", 0.045)   # jaw position, closed onto object
-        self.declare_parameter("gripper_hold", 0.04)      # jaw position while carrying (just off the object)
-        self.declare_parameter("move_speed", 0.6)         # rad/s used to time trajectories
+        self.declare_parameter("hover_height", 0.25)
+        self.declare_parameter("grasp_height", 0.135)
+        self.declare_parameter("place_height", 0.24)
+        self.declare_parameter("jog_step", 0.05)
+        self.declare_parameter("gripper_open", 0.0)
+        self.declare_parameter("gripper_closed", 0.045)
+        self.declare_parameter("gripper_hold", 0.04)
+        self.declare_parameter("move_speed", 0.6)
         self.declare_parameter("tip_link", "tool0")
 
         self.hover_height = self.get_parameter("hover_height").value
@@ -111,7 +80,6 @@ class UR10eInterface(Node):
         self.move_speed = self.get_parameter("move_speed").value
         self.tip_link = self.get_parameter("tip_link").value
 
-        # ---- State ----------------------------------------------------------
         self._lock = threading.Lock()
         self._joint_positions = {}
         self._model_poses = {}
@@ -119,7 +87,6 @@ class UR10eInterface(Node):
 
         cb_group = ReentrantCallbackGroup()
 
-        # ---- Subscriptions --------------------------------------------------
         self.create_subscription(
             JointState, "/joint_states", self._joint_state_cb, 10, callback_group=cb_group
         )
@@ -127,7 +94,6 @@ class UR10eInterface(Node):
             ModelStates, "/gazebo/model_states", self._model_states_cb, 10,
             callback_group=cb_group,
         )
-        # robot_description is published as a latched (transient local) topic.
         latched_qos = QoSProfile(
             depth=1,
             reliability=QoSReliabilityPolicy.RELIABLE,
@@ -138,20 +104,15 @@ class UR10eInterface(Node):
             callback_group=cb_group,
         )
 
-        # ---- Publishers -----------------------------------------------------
         self._traj_pub = self.create_publisher(
             JointTrajectory, "/joint_trajectory_controller/joint_trajectory", 10
         )
         self._gripper_pub = self.create_publisher(
             Float64MultiArray, "/gripper_controller/commands", 10
         )
-        # Continuously re-publish the current jaw command so the controller keeps
-        # holding it throughout the whole carry motion (robust to latching).
         self._gripper_cmd = [self.gripper_open, self.gripper_open]
         self.create_timer(0.1, self._republish_gripper, callback_group=cb_group)
 
-        # Kinematic grasp: while an object is "held", keep teleporting it to
-        # follow the tool frame (robust against ODE grasp instability).
         self._set_state_cli = self.create_client(
             SetEntityState, "/gazebo/set_entity_state", callback_group=cb_group
         )
@@ -160,7 +121,6 @@ class UR10eInterface(Node):
         self._set_future = None
         self.create_timer(0.01, self._follow_held, callback_group=cb_group)
 
-        # ---- Action server & service ---------------------------------------
         self._action_server = ActionServer(
             self,
             BaseAction,
@@ -177,9 +137,6 @@ class UR10eInterface(Node):
 
         self.get_logger().info("UR10e Interface | Robot Interface has launched")
 
-    # ------------------------------------------------------------------ #
-    # Subscription callbacks
-    # ------------------------------------------------------------------ #
     def _joint_state_cb(self, msg: JointState):
         with self._lock:
             for name, position in zip(msg.name, msg.position):
@@ -200,12 +157,9 @@ class UR10eInterface(Node):
                 f"UR10e Interface | Kinematics ready ({self.kin.num_joints} DOF): "
                 f"{self.kin.movable_names}"
             )
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover
             self.get_logger().error(f"UR10e Interface | Failed to parse URDF: {exc}")
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
     def _current_arm_q(self):
         with self._lock:
             missing = [j for j in self.kin.movable_names if j not in self._joint_positions]
@@ -216,7 +170,6 @@ class UR10eInterface(Node):
             )
 
     def _get_object_position(self, name, timeout=5.0):
-        """Return the world position of a Gazebo model, waiting briefly for it."""
         deadline = time.time() + timeout
         while True:
             with self._lock:
@@ -228,7 +181,6 @@ class UR10eInterface(Node):
             time.sleep(0.1)
 
     def _wait_for_prerequisites(self, timeout=10.0):
-        """Block until kinematics, joint states and model states are available."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self.kin is not None and self._current_arm_q() is not None:
@@ -237,13 +189,11 @@ class UR10eInterface(Node):
         return False
 
     def _solve_ik(self, target_transform, position_only=False):
-        """Try several seeds and return the best joint solution or None."""
         current = self._current_arm_q()
         seeds = []
         if current is not None:
             seeds.append(current)
         seeds.append(np.array([HOME_POSITION[j] for j in self.kin.movable_names]))
-        # A couple of perturbed seeds to escape poor local minima.
         rng = np.random.default_rng(0)
         base_seed = seeds[0]
         for _ in range(4):
@@ -262,7 +212,6 @@ class UR10eInterface(Node):
         return best_q
 
     def _send_arm_trajectory(self, target_q, min_time=2.0):
-        """Publish a single-point trajectory and block until it should finish."""
         current = self._current_arm_q()
         q_map = dict(zip(self.kin.movable_names, target_q))
         positions = [q_map[j] for j in ARM_JOINTS]
@@ -291,7 +240,6 @@ class UR10eInterface(Node):
         self._gripper_pub.publish(msg)
 
     def _attach(self, name):
-        """Kinematically attach a Gazebo model to the tool frame."""
         obj = self._get_object_position(name)
         tool = self._tool_pose()
         if obj is None or tool is None:
@@ -299,12 +247,9 @@ class UR10eInterface(Node):
                 f"UR10e Interface | Attach failed: '{name}' or tool pose unavailable"
             )
             return False
-        # Record the object position relative to the tool frame at grasp time.
         with self._lock:
             self._held_offset = tool[:3, :3].T @ (obj - tool[:3, 3])
             self._held = name
-        # Back the jaws slightly off the object so contact does not fight the
-        # kinematic hold (removes residual jitter while carrying).
         self._gripper_cmd = [self.gripper_hold, self.gripper_hold]
         self._republish_gripper()
         self.get_logger().info(f"UR10e Interface | Attached '{name}' to gripper")
@@ -347,7 +292,6 @@ class UR10eInterface(Node):
         tool = self._tool_pose()
         if tool is None or not self._set_state_cli.service_is_ready():
             return
-        # Skip if the previous call has not completed yet (avoid piling up).
         if self._set_future is not None and not self._set_future.done():
             return
         world_pos = tool[:3, 3] + tool[:3, :3] @ held_offset
@@ -356,16 +300,13 @@ class UR10eInterface(Node):
         state.pose.position.x = float(world_pos[0])
         state.pose.position.y = float(world_pos[1])
         state.pose.position.z = float(world_pos[2])
-        state.pose.orientation.w = 1.0  # keep the object upright
+        state.pose.orientation.w = 1.0
         state.reference_frame = "world"
         request = SetEntityState.Request()
         request.state = state
         self._set_future = self._set_state_cli.call_async(request)
 
     def _command_gripper(self, closed: bool):
-        # Ramp the position command slowly so the jaws squeeze gently instead of
-        # snapping shut (a hard step command ejects the cube). Both jaws move
-        # toward the center (order matches gripper_controller joints: left, right).
         target = self.gripper_closed if closed else self.gripper_open
         with self._lock:
             start = self._joint_positions.get("left_jaw_joint", self._gripper_cmd[0])
@@ -386,7 +327,6 @@ class UR10eInterface(Node):
         )
 
     def _tool_pose(self):
-        """Current tool transform (world) from FK, or None."""
         q = self._current_arm_q()
         if q is None:
             return None
@@ -394,7 +334,6 @@ class UR10eInterface(Node):
         return transform
 
     def _move_tool_to(self, position, orientation=None, position_only=False, min_time=2.0):
-        """IK to a world pose and execute. Returns (ok, message)."""
         if orientation is None:
             orientation = DOWN_ORIENTATION
         target = make_transform(orientation, np.asarray(position, dtype=float))
@@ -404,9 +343,6 @@ class UR10eInterface(Node):
         self._send_arm_trajectory(target_q, min_time=min_time)
         return True, ""
 
-    # ------------------------------------------------------------------ #
-    # Policies
-    # ------------------------------------------------------------------ #
     def _go_home(self):
         target_q = np.array([HOME_POSITION[j] for j in self.kin.movable_names])
         self._send_arm_trajectory(target_q, min_time=3.0)
@@ -424,18 +360,18 @@ class UR10eInterface(Node):
             f"UR10e Interface | '{name}' at {np.round(obj, 3).tolist()}, "
             f"hovering at {np.round(target, 3).tolist()}"
         )
-        # Start from the ready posture for a predictable, well-conditioned motion.
         self._go_home()
         return self._move_tool_to(target)
 
     def _pick(self, name):
+        if self._held != name:
+            self._detach()
         obj = self._get_object_position(name)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
         hover = np.array([obj[0], obj[1], obj[2] + self.hover_height])
         grasp = np.array([obj[0], obj[1], obj[2] + self.grasp_height])
         self._command_gripper(closed=False)
-        # self._go_home()
         ok, msg = self._move_tool_to(hover)
         if not ok:
             return ok, msg
@@ -455,7 +391,6 @@ class UR10eInterface(Node):
                 return False, f"Place target '{name}' not found in Gazebo model states"
             base = obj
         hover = np.array([base[0], base[1], base[2] + self.hover_height])
-        # Release above the tray opening so the gripper does not push into it.
         release = np.array([base[0], base[1], base[2] + self.place_height])
         ok, msg = self._move_tool_to(hover)
         if not ok:
@@ -463,7 +398,6 @@ class UR10eInterface(Node):
         ok, msg = self._move_tool_to(release, min_time=2.0)
         if not ok:
             return ok, msg
-        # Release the held object at the current pose, then open the jaws.
         self._detach()
         self._command_gripper(closed=False)
         return self._move_tool_to(hover, min_time=2.0)
@@ -474,12 +408,8 @@ class UR10eInterface(Node):
             return False, "Current tool pose unavailable"
         step = distance if distance and distance > 0.0 else self.jog_step
         target_pos = pose[:3, 3] + DIRECTION_VECTORS[direction] * step
-        # Keep the current orientation while jogging in a straight line.
         return self._move_tool_to(target_pos, orientation=pose[:3, :3], min_time=1.5)
 
-    # ------------------------------------------------------------------ #
-    # Action / service plumbing
-    # ------------------------------------------------------------------ #
     def goal_callback(self, goal_request):
         return GoalResponse.ACCEPT
 
@@ -526,18 +456,10 @@ class UR10eInterface(Node):
                 ok, msg = self._place(request.object_name, position)
             elif task in DIRECTION_VECTORS:
                 ok, msg = self._jog(task, request.x)
-            # elif task == "close_gripper":  # Not using now 
-            #     self._command_gripper(closed=True)
-            #     self._attach_nearest()
-            #     ok, msg = True, ""
-            # elif task == "open_gripper":
-            #     self._detach()
-            #     self._command_gripper(closed=False)
-            #     ok, msg = True, ""
             else:
                 ok, msg = False, f"Unexpected task: {task}"
                 self.get_logger().warn(f"UR10e Interface | {msg}")
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Exception during '{task}': {exc}"
             self.get_logger().error(f"UR10e Interface | {msg}")
 
@@ -568,7 +490,7 @@ class UR10eInterface(Node):
             else:
                 self._detach()
             self._command_gripper(closed=bool(request.activate))
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover
             self.get_logger().error(f"UR10e Interface | Unexpected gripper error: {exc}")
             response.success = False
             return response

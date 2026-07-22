@@ -19,6 +19,11 @@ RUN apt-get update && apt-get install -y \
     libasound2-plugins \
     libportaudio2 \
     pulseaudio-utils \
+    mesa-utils \
+    libgl1-mesa-dri \
+    libgl1-mesa-glx \
+    libegl1-mesa \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

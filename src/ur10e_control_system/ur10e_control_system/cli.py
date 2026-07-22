@@ -1,17 +1,3 @@
-"""Console command sender for the UR10e basic policies.
-
-Examples
---------
-    ros2 run ur10e_control_system cli move_to_object green_cube
-    ros2 run ur10e_control_system cli home
-    ros2 run ur10e_control_system cli forward 0.1
-    ros2 run ur10e_control_system cli move_to 0.3 0.2 1.05
-    ros2 run ur10e_control_system cli grasp
-    ros2 run ur10e_control_system cli release
-    ros2 run ur10e_control_system cli pick green_cube
-    ros2 run ur10e_control_system cli place white_tray
-"""
-
 import sys
 
 import rclpy  # type: ignore

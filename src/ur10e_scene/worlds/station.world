@@ -41,20 +41,117 @@
       </link>
     </model>
 
-    <model name="green_cube">
-      <pose>0.3 0.2 0.825 0 0 0</pose>
+    <!-- Small 45-45-90 wedge ramp from 3 flat plates, near +Y table edge opposite the cubes -->
+    <model name="ramp">
+      <pose>0.25 0.4 1.95 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>0.05</mass>
+          <mass>10.0</mass>
+          <pose>0 -0.04 0.03 0 0 0</pose>
           <inertia>
-            <ixx>2.1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>2.1e-5</iyy><iyz>0</iyz><izz>2.1e-5</izz>
+            <ixx>0.15</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.08</iyy><iyz>0</iyz>
+            <izz>0.18</izz>
+          </inertia>
+        </inertial>
+
+        <!-- Horizontal leg of the right triangle -->
+        <collision name="base_col">
+          <pose>0 -0.05 0.004 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.008</size></box></geometry>
+          <surface>
+            <friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction>
+            <contact>
+              <ode><kp>100000.0</kp><kd>100.0</kd><max_vel>0.0</max_vel><min_depth>0.001</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
+        <visual name="base_vis">
+          <pose>0 -0.05 0.004 0 0 0</pose>
+          <geometry><box><size>0.10 0.10 0.008</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Orange</name></script></material>
+        </visual>
+
+        <!-- Vertical leg of the right triangle -->
+        <collision name="back_col">
+          <pose>0 -0.004 0.05 0 0 0</pose>
+          <geometry><box><size>0.10 0.008 0.10</size></box></geometry>
+          <surface>
+            <friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction>
+            <contact>
+              <ode><kp>100000.0</kp><kd>100.0</kd><max_vel>0.0</max_vel><min_depth>0.001</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
+        <visual name="back_vis">
+          <pose>0 -0.004 0.05 0 0 0</pose>
+          <geometry><box><size>0.10 0.008 0.10</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Orange</name></script></material>
+        </visual>
+
+        <!-- Hypotenuse: the 45° ramp surface -->
+        <collision name="slope_col">
+          <pose>0 -0.05 0.05 0.785398 0 0</pose>
+          <geometry><box><size>0.10 0.14142 0.008</size></box></geometry>
+          <surface>
+            <friction><ode><mu>0.2</mu><mu2>0.2</mu2></ode></friction>
+            <contact>
+              <ode><kp>100000.0</kp><kd>100.0</kd><max_vel>0.0</max_vel><min_depth>0.001</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
+        <visual name="slope_vis">
+          <pose>0 -0.05 0.05 0.785398 0 0</pose>
+          <geometry><box><size>0.10 0.14142 0.008</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Orange</name></script></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Medium ball in the middle of the table (diameter ≈ cube size) -->
+    <model name="ball">
+      <pose>0.0 0.0 0.825 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>3.0e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>3.0e-5</iyy><iyz>0</iyz>
+            <izz>3.0e-5</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><sphere><radius>0.025</radius></sphere></geometry>
+          <surface>
+            <friction><ode><mu>0.4</mu><mu2>0.4</mu2></ode></friction>
+            <contact>
+              <ode><kp>10000.0</kp><kd>1.0</kd><max_vel>5.0</max_vel><min_depth>0.001</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry><sphere><radius>0.025</radius></sphere></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Light 3-cube pyramid on the right (-Y) of the manipulator -->
+    <model name="pyramid_cube_1">
+      <pose>0.225 -0.35 0.825 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.015</mass>
+          <inertia>
+            <ixx>6.25e-6</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>6.25e-6</iyy><iyz>0</iyz>
+            <izz>6.25e-6</izz>
           </inertia>
         </inertial>
         <collision name="collision">
           <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
           <surface>
-            <friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction>
+            <friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction>
             <contact>
               <ode><kp>10000.0</kp><kd>10.0</kd><max_vel>0.0</max_vel><min_depth>0.002</min_depth></ode>
             </contact>
@@ -67,20 +164,48 @@
       </link>
     </model>
 
-    <model name="red_cube">
-      <pose>0.2 0.1 0.825 0 0 0</pose>
+    <model name="pyramid_cube_2">
+      <pose>0.275 -0.35 0.825 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>0.05</mass>
+          <mass>0.015</mass>
           <inertia>
-            <ixx>2.1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>2.1e-5</iyy><iyz>0</iyz><izz>2.1e-5</izz>
+            <ixx>6.25e-6</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>6.25e-6</iyy><iyz>0</iyz>
+            <izz>6.25e-6</izz>
           </inertia>
         </inertial>
         <collision name="collision">
           <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
           <surface>
-            <friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction>
+            <friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction>
+            <contact>
+              <ode><kp>10000.0</kp><kd>10.0</kd><max_vel>0.0</max_vel><min_depth>0.002</min_depth></ode>
+            </contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pyramid_cube_3">
+      <pose>0.25 -0.35 0.875 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.015</mass>
+          <inertia>
+            <ixx>6.25e-6</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>6.25e-6</iyy><iyz>0</iyz>
+            <izz>6.25e-6</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <surface>
+            <friction><ode><mu>0.6</mu><mu2>0.6</mu2></ode></friction>
             <contact>
               <ode><kp>10000.0</kp><kd>10.0</kd><max_vel>0.0</max_vel><min_depth>0.002</min_depth></ode>
             </contact>
@@ -90,88 +215,6 @@
           <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
           <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Red</name></script></material>
         </visual>
-      </link>
-    </model>
-
-    <model name="yellow_cube">
-      <pose>0.2 0.2 0.825 0 0 0</pose>
-      <link name="link">
-        <inertial>
-          <mass>0.05</mass>
-          <inertia>
-            <ixx>2.1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>2.1e-5</iyy><iyz>0</iyz><izz>2.1e-5</izz>
-          </inertia>
-        </inertial>
-        <collision name="collision">
-          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
-          <surface>
-            <friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction>
-            <contact>
-              <ode><kp>10000.0</kp><kd>10.0</kd><max_vel>0.0</max_vel><min_depth>0.002</min_depth></ode>
-            </contact>
-          </surface>
-        </collision>
-        <visual name="visual">
-          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
-          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Yellow</name></script></material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="white_box">
-      <pose>0.3 -0.2 0.8 0 0 0</pose>
-      <link name="link">
-        <inertial>
-          <mass>0.15</mass>
-          <inertia>
-            <ixx>2.1e-4</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>2.1e-4</iyy><iyz>0</iyz><izz>3.6e-4</izz>
-          </inertia>
-        </inertial>
-        
-        <collision name="bottom_col"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry></collision>
-        <visual name="bottom_vis"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
-        
-        <collision name="wall1_col"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
-        <visual name="wall1_vis"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
-        
-        <collision name="wall2_col"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
-        <visual name="wall2_vis"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
-        
-        <collision name="wall3_col"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
-        <visual name="wall3_vis"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
-        
-        <collision name="wall4_col"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
-        <visual name="wall4_vis"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material></visual>
-      </link>
-    </model>
-
-    <model name="blue_box">
-      <pose>0.1 -0.2 0.8 0 0 0</pose>
-      <link name="link">
-        <inertial>
-          <mass>0.15</mass>
-          <inertia>
-            <ixx>2.1e-4</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>2.1e-4</iyy><iyz>0</iyz><izz>3.6e-4</izz>
-          </inertia>
-        </inertial>
-        
-        <collision name="bottom_col"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry></collision>
-        <visual name="bottom_vis"><pose>0 0 0.005 0 0 0</pose><geometry><box><size>0.12 0.12 0.01</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material></visual>
-        
-        <collision name="wall1_col"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
-        <visual name="wall1_vis"><pose>0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material></visual>
-        
-        <collision name="wall2_col"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry></collision>
-        <visual name="wall2_vis"><pose>-0.055 0 0.025 0 0 0</pose><geometry><box><size>0.01 0.12 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material></visual>
-        
-        <collision name="wall3_col"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
-        <visual name="wall3_vis"><pose>0 0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material></visual>
-        
-        <collision name="wall4_col"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry></collision>
-        <visual name="wall4_vis"><pose>0 -0.055 0.025 0 0 0</pose><geometry><box><size>0.1 0.01 0.05</size></box></geometry><material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/Blue</name></script></material></visual>
       </link>
     </model>
 

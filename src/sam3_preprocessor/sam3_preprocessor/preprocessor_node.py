@@ -35,7 +35,6 @@ class PreprocessorNode(Node):
 
     def callback(self, msg: CompressedImage) -> None:
         try:
-            # self.get_logger().info('Image received.')
             self.pub.publish(msg)
         except Exception as e:
             self.get_logger().error(f'PreprocessorNode | Error while publishing image: {str(e)}')

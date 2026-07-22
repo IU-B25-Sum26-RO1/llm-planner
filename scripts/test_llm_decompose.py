@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Quick harness to test llama3 decomposition quality."""
 
 import asyncio
 import json

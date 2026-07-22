@@ -74,7 +74,6 @@ class SAM3BridgeNode(Node):
             self.get_logger().info("Async event loop closed.")
 
     def image_callback(self, msg: CompressedImage) -> None:
-        # self.get_logger().info("Image Callback | Received image")
         if self.frame_queue is None:
             return
         
@@ -175,16 +174,11 @@ class SAM3BridgeNode(Node):
                     elif frame_task in done:
                         msg: CompressedImage = await self.frame_queue.get()
 
-                        frame_size_kb = len(msg.data) / 1024.0
-                        # self.get_logger().info(f'[SEND] Get frame from the queue. Size: {frame_size_kb:.1f} KB. Sending...')
-
                         frame_id = f"{msg.header.stamp.sec}_{msg.header.stamp.nanosec}"
                         
                         if not ws.closed:
                             await ws.send_bytes(bytes(msg.data))
                             self.latency_tracker[frame_id] = self.get_clock().now()
-
-                        # self.get_logger().info(f'[SEND] Frame {frame_id} sent.')
 
                         if len(self.latency_tracker) > 50:
                             first_key = next(iter(self.latency_tracker))

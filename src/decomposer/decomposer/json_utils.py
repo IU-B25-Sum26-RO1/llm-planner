@@ -7,7 +7,6 @@ _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
 
 
 def extract_json_text(raw: str) -> str:
-    """Extract a JSON object string from raw LLM output."""
     text = (raw or "").strip()
     if not text:
         raise ValueError("Empty LLM response")
@@ -25,7 +24,6 @@ def extract_json_text(raw: str) -> str:
 
 
 def parse_llm_json(raw: str) -> dict[str, Any]:
-    """Parse JSON from LLM output, tolerating markdown fences and extra prose."""
     candidate = extract_json_text(raw)
     try:
         parsed = json.loads(candidate)
@@ -39,7 +37,6 @@ def parse_llm_json(raw: str) -> dict[str, Any]:
 
 
 def is_valid_command_dict(data: dict[str, Any]) -> bool:
-    """Minimal structural check before downstream processing."""
     if "error" in data:
         return False
 

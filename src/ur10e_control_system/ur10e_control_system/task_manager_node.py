@@ -157,8 +157,6 @@ class TaskManagerNode(Node):
         return goal_msg
     
     async def _async_ros_future(self, rclpy_future):
-        """Конвертирует rclpy.task.Future в честный asyncio.Future, 
-        который не блокирует Executor ноды."""
         loop = asyncio.get_running_loop()
         asyncio_future = loop.create_future()
 

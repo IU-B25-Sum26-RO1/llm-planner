@@ -118,4 +118,3 @@ if __name__ == "__main__":
     flat = adapter.json_schema(mode="serialization")
 
     print(json.dumps(flat, ensure_ascii=False, indent='\t'))
-    # print(json.dumps(OutputCommandSchema.model_json_schema(), ensure_ascii=False, indent='\t'))

@@ -1,27 +1,14 @@
-"""Kinematics helper for the anchored UR10e.
-
-The forward kinematics (FK), geometric Jacobian and a damped-least-squares (DLS)
-inverse kinematics (IK) solver are built directly from the robot URDF that
-``robot_state_publisher`` publishes on ``/robot_description``.
-
-Building everything from the URDF (instead of hardcoding DH parameters) keeps the
-model perfectly consistent with the tf tree and with the Gazebo world frame:
-FK(q) of ``tool0`` is expressed in the same ``world`` frame in which we read the
-green cube coordinates from Gazebo, so no fragile frame calibration is needed.
-"""
-
 import math
 
 import numpy as np
 
 try:
     from urdf_parser_py.urdf import URDF  # type: ignore
-except ImportError:  # pragma: no cover - fallback name on some distros
+except ImportError:  # pragma: no cover
     from urdf_parser_py.urdf import Robot as URDF  # type: ignore
 
 
 def rpy_to_matrix(rpy):
-    """URDF fixed-axis roll-pitch-yaw -> 3x3 rotation matrix (Rz * Ry * Rx)."""
     r, p, y = rpy
     cr, sr = math.cos(r), math.sin(r)
     cp, sp = math.cos(p), math.sin(p)
@@ -33,7 +20,6 @@ def rpy_to_matrix(rpy):
 
 
 def axis_angle_matrix(axis, angle):
-    """Rodrigues' rotation of ``angle`` around unit-ish ``axis``."""
     axis = np.asarray(axis, dtype=float)
     norm = np.linalg.norm(axis)
     if norm < 1e-12:
@@ -56,19 +42,15 @@ def make_transform(rotation, translation):
 
 
 def rotation_to_vector(rotation):
-    """Rotation matrix -> rotation vector (axis * angle)."""
     cos_angle = (np.trace(rotation) - 1.0) / 2.0
     cos_angle = max(-1.0, min(1.0, cos_angle))
     angle = math.acos(cos_angle)
     if angle < 1e-9:
         return np.zeros(3)
     if abs(angle - math.pi) < 1e-6:
-        # Near pi the generic formula is numerically unstable; pull the axis
-        # out of the diagonal of (R + I) / 2.
         diag = (np.diag(rotation) + 1.0) / 2.0
         diag = np.clip(diag, 0.0, None)
         axis = np.sqrt(diag)
-        # Recover signs from the off-diagonal terms.
         if rotation[0, 1] + rotation[1, 0] < 0:
             axis[1] = -axis[1]
         if rotation[0, 2] + rotation[2, 0] < 0:
@@ -88,8 +70,8 @@ class _ChainJoint:
     def __init__(self, name, jtype, origin, axis, lower, upper):
         self.name = name
         self.jtype = jtype
-        self.origin = origin  # 4x4 fixed transform parent -> joint
-        self.axis = axis      # 3-vector in the joint frame
+        self.origin = origin
+        self.axis = axis
         self.lower = lower
         self.upper = upper
 
@@ -103,14 +85,11 @@ class _ChainJoint:
 
 
 class URKinematics:
-    """FK / Jacobian / DLS-IK for a serial chain extracted from a URDF."""
-
     def __init__(self, urdf_xml, root_link="world", tip_link="tool0"):
         robot = URDF.from_xml_string(urdf_xml)
         self.root_link = root_link
         self.tip_link = tip_link
 
-        # Walk from the tip up to the root using the parent map.
         chain = []
         link = tip_link
         guard = 0
@@ -154,13 +133,6 @@ class URKinematics:
         self.num_joints = len(self.movable_names)
 
     def fk(self, q):
-        """Return (T_tip, axes, points) with per-joint world axes/origins.
-
-        ``T_tip`` is the 4x4 transform ``root_link`` -> ``tip_link``.
-        ``axes`` and ``points`` (one entry per movable joint, in chain order)
-        describe the joint screw in world coordinates and are reused to assemble
-        the geometric Jacobian.
-        """
         q = np.asarray(q, dtype=float)
         transform = np.eye(4)
         axes = []
@@ -216,7 +188,6 @@ class URKinematics:
         damping=0.06,
         max_step=0.2,
     ):
-        """Damped-least-squares IK. Returns (q, converged)."""
         q = self._clamp(np.asarray(q_seed, dtype=float).copy())
         target_p = target[:3, 3]
         target_r = target[:3, :3]
@@ -246,7 +217,6 @@ class URKinematics:
             if norm > max_step:
                 dq = dq * (max_step / norm)
             q = self._clamp(q + dq)
-        # Final convergence check after the loop.
         _, transform = self.jacobian(q)
         pos_err = np.linalg.norm(target_p - transform[:3, 3])
         if position_only:

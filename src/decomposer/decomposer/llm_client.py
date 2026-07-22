@@ -1,9 +1,5 @@
 import httpx
-<<<<<<< Updated upstream
-import json
-=======
 import time
->>>>>>> Stashed changes
 import traceback
 from openai import AsyncOpenAI
 
@@ -30,9 +26,6 @@ class LLMClient:
             self.logger.info("LLM Client | Client has started.")
 
     async def decompose(self, message: str, temperature: float = DEFAULT_TEMPERATURE) -> dict:
-        """
-        Calls the LLM API to decompose the given natural language command into json format.
-        """
         if self.client is None:
             self.client = AsyncOpenAI(
                 base_url=self.base_url,
@@ -90,9 +83,6 @@ class LLMClient:
         ]
 
         try:
-<<<<<<< Updated upstream
-            response = await self.client.chat.completions.create(
-=======
             return await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -105,18 +95,7 @@ class LLMClient:
                     f"LLM Client | JSON response_format unsupported, retrying without it: {exc}"
                 )
             return await self.client.chat.completions.create(
->>>>>>> Stashed changes
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
             )
-<<<<<<< Updated upstream
-            self.logger.info(f"LLM response: {response.choices[0].message.content}")
-            return json.loads(response.choices[0].message.content)
-        
-        except Exception as e:
-            self.logger.error(f"Error during LLM decomposition: {str(e)}")
-            full_error = traceback.format_exc()
-            return {"error": str(e)}
-=======
->>>>>>> Stashed changes

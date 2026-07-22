@@ -11,7 +11,6 @@ from std_msgs.msg import String
 from decomposer.llm_client import LLMClient
 from decomposer.sys_prompt_collector import get_system_prompt
 
-# from schemas.output_cmd import OutputCommandSchema, TaskSchema, TargetSchema, ObjectSchema
 
 class DecomposerNode(Node):
     def __init__(self):
@@ -65,8 +64,8 @@ class DecomposerNode(Node):
             10
         )
 
-        self.objects = {} # object key -> object
-        
+        self.objects = {}
+
         self.async_loop = asyncio.new_event_loop()
         self.worker_thread = threading.Thread(target=self._start_async_loop, daemon=True)
         self.worker_thread.start()
@@ -92,9 +91,6 @@ class DecomposerNode(Node):
     async def _async_decompose_and_publish(self, text: str):
         try:
             result_dict = await self.llm_client.decompose(text)
-<<<<<<< Updated upstream
-            self.identify_output(result_dict)
-=======
 
             if "error" in result_dict:
                 self.get_logger().error(
@@ -111,16 +107,14 @@ class DecomposerNode(Node):
                     f"Unexpected command type '{result_dict.get('type')}' for '{text}'"
                 )
                 return
-
+            
             self._parse_and_identify(result_dict)
->>>>>>> Stashed changes
             self.publish_cmd(result_dict)
 
         except Exception as e:
             self.get_logger().error(f"Failed to process or publish decomposition: {str(e)}")
 
     def _parse_and_identify(self, cmd_obj):
-        """ Parses command_object and assign if for each object and task. """
         cmd_obj["id"] = self.generate_prefixed_id("cmd")
         for task in cmd_obj["tasks"]:
             task["id"] = self.generate_prefixed_id("tsk")
@@ -142,17 +136,9 @@ class DecomposerNode(Node):
                     objects.append(space["reference"])
                 
                 for obj in objects:
-                    self._resolve_object_key(obj)
+                    obj["key"] = self._resolve_object_key(obj)
     
     def _resolve_object_key(self, obj: dict) -> str:
-        """ Resolving object duplicating problem. Updating existing objects info.
-
-        Args:
-            obj (`dict`): Object (see schemas/output_cmd.py).
-
-        Returns: 
-            Unique object key (existing or new) (`str`).
-        """
         for existing_obj in self.objects.values():
             if existing_obj["class"] != obj["class"]:
                 continue
@@ -187,7 +173,6 @@ class DecomposerNode(Node):
         super().destroy_node()
     
     def publish_cmd(self, cmd_obj: dict):
-        self.get_logger().info(f"Published command: {cmd_obj['id']}")
         json_string = json.dumps(cmd_obj, ensure_ascii=False)
         out_msg = String()
         out_msg.data = json_string
@@ -197,7 +182,6 @@ class DecomposerNode(Node):
             self.publish_task(task)
 
     def publish_task(self, task: dict):
-        self.get_logger().info(f"Publishing task: {task['id']}")
         task_string = json.dumps(task, ensure_ascii=False)
         out_msg = String()
         out_msg.data = task_string
@@ -215,7 +199,6 @@ class DecomposerNode(Node):
             self.publish_target(main_target)
 
     def publish_target(self, target: dict):
-        self.get_logger().info(f"Publishing target: {target['key']}")
         target_string = json.dumps(target, ensure_ascii=False)
         out_msg = String()
         out_msg.data = target_string
@@ -224,7 +207,6 @@ class DecomposerNode(Node):
     
     def publish_object(self, obj: dict):
         obj["key"] = self.generate_prefixed_id("obj")
-        self.get_logger().info(f"Published object: {obj['key']}")
         obj_string = json.dumps(obj, ensure_ascii=False)
         out_msg = String()
         out_msg.data = obj_string

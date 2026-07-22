@@ -39,6 +39,8 @@ services:
     container_name: decomposer_container
     depends_on:
       - audio_processor
+      - simulation
+      - ur10e_control
     
     network_mode: "host"
     ipc: host
@@ -63,29 +65,44 @@ services:
     image: llm_planner_image:latest
     container_name: simulation_container
 
+    privileged: true
+
     devices:
       - /dev/dxg:/dev/dxg
 
     network_mode: "host"
     ipc: host
-    
+
     environment:
-      - DISPLAY=${DISPLAY}
-      - LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - DISPLAY=${DISPLAY:-:0}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
+      - LD_LIBRARY_PATH=/usr/lib/wsl/lib
+      - MESA_D3D12_DEFAULT_ADAPTER_NAME=${MESA_D3D12_DEFAULT_ADAPTER_NAME:-NVIDIA}
+      - LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1}
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
 
       - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS}
       - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH}
       - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT}
-    
+
     volumes:
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /usr/lib/wsl:/usr/lib/wsl
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+      - /mnt/wslg:/mnt/wslg
       - ./src:/workspace/src
-    
-    command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py && ros2 run rqt_image_view rqt_image_view"   
-    # command: bash -c "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash"     
 
+    command: >-
+      bash -c "mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root &&
+      source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash &&
+      if [ \"$${LIBGL_ALWAYS_SOFTWARE}\" = \"1\" ]; then
+        xvfb-run -a -s '-screen 0 1920x1080x24' ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py;
+      else
+        ros2 launch /workspace/src/ur10e_scene/launch/start_scene.launch.py;
+      fi"
   sam3_preprocessor:
     image: llm_planner_image:latest
     container_name: sam3_preprocessor_container
@@ -130,8 +147,8 @@ services:
     container_name: control_container
     depends_on:
       - audio_processor
-      - decomposer
-      - simulation
+      # - decomposer
+      # - simulation
     
     network_mode: "host"
     ipc: host

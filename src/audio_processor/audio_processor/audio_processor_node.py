@@ -25,7 +25,7 @@ class AudioProcessorNode(Node):
         samplerate = self.get_parameter('samplerate').value
         blocksize = self.get_parameter('block_size').value
         
-        self.text_publisher = self.create_publisher(String, '/recognized_text', 10)
+        self.text_publisher = self.create_publisher(String, '/recognized_textt', 10)
 
         self.async_loop = asyncio.new_event_loop()
         self.is_running = True
@@ -41,12 +41,10 @@ class AudioProcessorNode(Node):
         self.get_logger().info("Audio Processor Node initialized.")
     
     def run_async_loop(self):
-        """Метод для инициализации и старта asyncio цикла в отдельном потоке."""
         asyncio.set_event_loop(self.async_loop)
         self.async_loop.run_until_complete(self._start_audio_processing())
     
     async def _start_audio_processing(self):
-        """Главный асинхронный цикл обработки."""
         self.get_logger().info("Starting audio processing loop...")
 
         while rclpy.ok() and self.is_running:
