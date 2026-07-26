@@ -234,16 +234,18 @@ Example:
     "tasks": [
         {
             "action":"pick",
+            "target": {"class": "mug", ...},
             ...
         },
         {
             "action":"place",
+            "target": null,
             ...
         }
     ]
 }
 
-If a later action refers to an object from a previous action using words like
+If an action after "pick" refers to an object from a previous action using words like
 
 её
 его
@@ -252,7 +254,7 @@ If a later action refers to an object from a previous action using words like
 эта
 этот
 
-then duplicate the object description into the target[object] field. 
+then DO NOT duplicate information (fill { "target": null })
 
 ==================================================
 OBJECT RESOLUTION ORDER
@@ -489,9 +491,9 @@ target:
         "attributes": {...},
         "prompt": "red part"
     },
-    "search_space":[
+    "search_space": [
         {
-            "relation":"on_top_of",
+            "relation": "on_top_of",
             "reference": { "class": "table", ... }
         }
     ],
@@ -510,9 +512,9 @@ target:
         "class": "cup",
         ...
     },
-    "search_space":[
+    "search_space": [
         {
-            "relation":"left_of",
+            "relation": "left_of",
             "reference": { "class": "bottle", ... }
         }
     ],
@@ -528,7 +530,7 @@ target:
 search_space:
 [
     {
-        "relation":"inside",
+        "relation": "inside",
         "reference": { "class": "box", ... }
     }
 ]
@@ -587,7 +589,7 @@ Examples
 
 selection:
 {
-    "type":"nearest"
+    "type": "nearest"
 }
 
 --------------------------------------------------
@@ -598,7 +600,7 @@ selection:
 
 selection:
 {
-    "type":"largest"
+    "type": "largest"
 }
 
 --------------------------------------------------
@@ -609,7 +611,7 @@ selection:
 
 selection:
 {
-    "type":"any"
+    "type": "any"
 }
 
 --------------------------------------------------
@@ -620,7 +622,7 @@ selection:
 
 selection:
 {
-    "type":"leftmost"
+    "type": "leftmost"
 }
 
 search_space = []
@@ -634,9 +636,9 @@ search_space = []
 search_space:
 [
     {
-        "relation":"left_of",
-        "reference":{
-            "class":"bottle",
+        "relation": "left_of",
+        "reference": {
+            "class": "bottle",
             ...
         }
     }
@@ -653,8 +655,8 @@ selection = null
 search_space:
 [
     {
-        "relation":"near",
-        "reference":{
+        "relation": "near",
+        "reference": {
             "class":"bottle",
             ...
         }
@@ -663,7 +665,7 @@ search_space:
 
 selection:
 {
-    "type":"leftmost"
+    "type": "leftmost"
 }
 
 --------------------------------------------------
@@ -711,7 +713,7 @@ Examples
 
 placement:
 {
-    "relation":"on_top_of",
+    "relation": "on_top_of",
     "reference": {
         "object": {
             "class": "box",
@@ -731,8 +733,8 @@ placement:
 
 placement:
 {
-    "relation":"inside",
-    "reference":{
+    "relation": "inside",
+    "reference": {
         "object": {
             "class": "box",
             "attributes": {...},
@@ -753,8 +755,8 @@ placement:
 
 placement:
 {
-    "relation":"left_of",
-    "reference":{
+    "relation": "left_of",
+    "reference": {
         "object": {
             "class": "bottle",
             "attributes": {...},
@@ -860,7 +862,7 @@ UNKNOWN
 If Action cannot be determined:
 
 {
-    "action":"unknown",
+    "action": "unknown",
     ...
 }
 
@@ -906,23 +908,7 @@ Output:
         },
         {
             "action": "place",
-            "target": {
-                "object": {
-                    "class": "lid",
-                    "attributes": {
-                        "color": null,
-                        "size": null,
-                        "shape": null,
-                        "material": null,
-                        "state": null
-                    },
-                    "prompt": "lid"
-                },
-                "search_space": [],
-                "selection": {
-                    "type": "leftmost"
-                }
-            },
+            "target": null
             "placement": {
                 "reference": {
                     "object": {
@@ -1021,21 +1007,7 @@ Output:
         },
         {
             "action": "place",
-            "target": {
-                "object": {
-                    "class": "ball",
-                    "attributes": {
-                        "color": "green",
-                        "size": null,
-                        "shape": null,
-                        "material": null,
-                        "state": null
-                    },
-                    "prompt": "green ball"
-                },
-                "search_space": [],
-                "selection": null
-            },
+            "target": null
             "placement": {
                 "reference": {
                     "object": {
