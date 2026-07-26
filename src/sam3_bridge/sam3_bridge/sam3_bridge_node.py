@@ -6,13 +6,13 @@ import threading
 import json
 
 import aiohttp
-import rclpy
+import rclpy                                       # type: ignore
 import numpy as np
-from rclpy.node import Node
-from std_msgs.msg import String
-from sensor_msgs.msg import CompressedImage, Image
+from rclpy.node import Node                        # type: ignore
+from std_msgs.msg import String                    # type: ignore
+from sensor_msgs.msg import CompressedImage, Image # type: ignore
 import cv2
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge                     # type: ignore
 
 
 class SAM3BridgeNode(Node):
@@ -20,7 +20,7 @@ class SAM3BridgeNode(Node):
         super().__init__('sam3_bridge_node')
         
         self.image_sub_topic = 'camera/color/image_raw/processed'
-        self.target_sub_topic = '/decomposer/json_output/target'
+        self.target_sub_topic = '/to_track/target'
         self.raw_mask_pub_topic = '/sam3/output/mask_raw'
 
         self.declare_parameter('image_sub_topic', self.image_sub_topic)
@@ -77,6 +77,9 @@ class SAM3BridgeNode(Node):
         if self.frame_queue is None:
             return
         
+        if self.loop is None:
+            return 
+        
         if self.frame_queue.full():
             try:
                 self.loop.call_soon_threadsafe(self.frame_queue.get_nowait)
@@ -90,11 +93,15 @@ class SAM3BridgeNode(Node):
             self.get_logger().warn("Target queue is not initialized yet. Dropping target")
             return
         
+        if self.loop is None:
+            self.get_logger().warn("Executing loop is not initialized yet. Dropping target")
+            return 
+        
         try:
             target_data = json.loads(msg.data)
 
             payload = {
-                "type": "update_prompts",
+                "type": "update_target",
                 "target": target_data
             }
 
@@ -145,6 +152,14 @@ class SAM3BridgeNode(Node):
     
     async def send_loop(self, ws):
         self.get_logger().info('Send loop initialized and running.')
+
+        if self.target_queue is None:
+            self.get_logger().warn("Target queue is not initialized yet. Dropping target")
+            return
+        
+        if self.frame_queue is None:
+            self.get_logger().warn("Frame queue is not initialized yet. Dropping frame")
+            return
 
         frame_task = asyncio.create_task(self.frame_queue.get())
         target_task = asyncio.create_task(self.target_queue.get())
