@@ -19,6 +19,7 @@ class TaskManagerNode(Node):
         super().__init__('task_manager_node')
         
         json_command_topic = 'decomposer/json_output/command'
+        target_tracker_topic = 'to_track/target'
 
         base_action_topic = '/execute/base_action'
         gripper_control_topic = '/execute/gripper_control'
@@ -28,6 +29,12 @@ class TaskManagerNode(Node):
             json_command_topic,
             self._command_callback,
             10
+        )
+
+        self.current_target_pub = self.create_publisher(
+            String, 
+            self.current_target_pub,
+            1
         )
 
         self.task_queue = None
@@ -40,6 +47,14 @@ class TaskManagerNode(Node):
             GripperControl,
             gripper_control_topic
         )
+
+        self.state = {
+            "held": None,
+            "in_fault": False
+        }
+
+        self.executing_task = None
+        self.current_target = None
 
         self.loop = None
         self.loop_tread = threading.Thread(target=self._run_async_loop, daemon=True)
@@ -73,6 +88,13 @@ class TaskManagerNode(Node):
                 task = items[2]
                 action = task["action"]
                 success = False
+
+                self.executing_task = task
+                self._select_target(task=self.executing_task)
+
+                self.current_target_pub.publish(
+                    json.dumps(self.current_target)
+                )
                 
                 if action == "open_gripper":
                     success = await self.send_gripper_command(activate=False)
@@ -85,6 +107,9 @@ class TaskManagerNode(Node):
                     self.get_logger().info("Task Manager | Task successfully completed")
                 else:
                     self.get_logger().warn("Task Manager | Task failed")
+                
+                self._update_state(success)
+                self.executing_task = None
                 
                 self.task_queue.task_done()
             except asyncio.CancelledError:
@@ -168,6 +193,10 @@ class TaskManagerNode(Node):
         return await asyncio_future
     
     def _command_callback(self, msg: String) -> None:
+        if self.loop is None:
+            self.get_logger().warn("Executing loop is not initialized yet. Dropping command")
+            return 
+        
         if self.task_queue is None:
             self.get_logger().warn("Task queue is not initialized yet. Dropping command")
             return
@@ -189,6 +218,33 @@ class TaskManagerNode(Node):
             self.get_logger().error(f"Task Manager | Received invalid JSON string in command_callback: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Task Manager | Error in command_callback: {e}")
+    
+    def _update_state(self, success: bool) -> None:
+        """Update robot's state."""
+        if not success:
+            self.state["in_fault"] = True
+        else:
+            if self.executing_task is None:
+                self.get_logger().warn(f"Executing command is None. Cannot update state")
+                return 
+            if self.executing_task["action"] == "pick":
+                self.state["held"] = self.executing_task["target"]["object"]
+            
+        
+    def _select_target(self, task: dict) -> None:
+        if task["action"] == "pick":
+            target = task["target"]
+        elif task["action"] == "place":
+            target = task["placement"]["reference"]
+        else:
+            target = None 
+        
+        self.current_target = target
+        if self.current_target is not None:
+            self.get_logger().info(f"Task Manager | Selected target: {self.current_target['key']} ({self.current_target["object"]["prompt"]})")
+        else: 
+            self.get_logger().info(f"Task Manager | Selected target: null")
+
 
 
 def main(args=None):
