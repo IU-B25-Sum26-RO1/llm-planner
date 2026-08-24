@@ -19,7 +19,7 @@ class TaskManagerNode(Node):
         super().__init__('task_manager_node')
         
         json_command_topic = 'decomposer/json_output/command'
-        target_tracker_topic = 'to_track/target'
+        target_tracker_topic = '/to_track/target'
 
         base_action_topic = '/execute/base_action'
         gripper_control_topic = '/execute/gripper_control'
@@ -32,8 +32,8 @@ class TaskManagerNode(Node):
         )
 
         self.current_target_pub = self.create_publisher(
-            String, 
-            self.current_target_pub,
+            String,
+            target_tracker_topic,
             1
         )
 
@@ -92,9 +92,9 @@ class TaskManagerNode(Node):
                 self.executing_task = task
                 self._select_target(task=self.executing_task)
 
-                self.current_target_pub.publish(
-                    json.dumps(self.current_target)
-                )
+                target_msg = String()
+                target_msg.data = json.dumps(self.current_target)
+                self.current_target_pub.publish(target_msg)
                 
                 if action == "open_gripper":
                     success = await self.send_gripper_command(activate=False)
@@ -241,7 +241,11 @@ class TaskManagerNode(Node):
         
         self.current_target = target
         if self.current_target is not None:
-            self.get_logger().info(f"Task Manager | Selected target: {self.current_target['key']} ({self.current_target["object"]["prompt"]})")
+            target_key = self.current_target['key']
+            target_prompt = self.current_target['object']['prompt']
+            self.get_logger().info(
+                f"Task Manager | Selected target: {target_key} ({target_prompt})"
+            )
         else: 
             self.get_logger().info(f"Task Manager | Selected target: null")
 

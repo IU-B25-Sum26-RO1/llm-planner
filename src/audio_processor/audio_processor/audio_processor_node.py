@@ -25,7 +25,7 @@ class AudioProcessorNode(Node):
         samplerate = self.get_parameter('samplerate').value
         blocksize = self.get_parameter('block_size').value
         
-        self.text_publisher = self.create_publisher(String, '/recognized_textt', 10)
+        self.text_publisher = self.create_publisher(String, '/recognized_text', 10)
 
         self.async_loop = asyncio.new_event_loop()
         self.is_running = True
