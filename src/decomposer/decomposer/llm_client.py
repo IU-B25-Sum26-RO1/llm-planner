@@ -3,7 +3,7 @@ import time
 import traceback
 from openai import AsyncOpenAI
 
-from decomposer.json_utils import is_valid_command_dict, parse_llm_json
+from decomposer.json_utils import parse_llm_json, validate_command_dict
 
 
 class LLMClient:
@@ -53,9 +53,7 @@ class LLMClient:
                 raw_content = response.choices[0].message.content or ""
                 self.logger.info(f"LLM Client | Response latency: {latency:.2f} s")
 
-                result = parse_llm_json(raw_content)
-                if not is_valid_command_dict(result):
-                    raise ValueError(f"LLM JSON has invalid structure: {result}")
+                result = validate_command_dict(parse_llm_json(raw_content))
 
                 self.logger.info(
                     f"LLM Client | Parsed command type={result.get('type')}, "

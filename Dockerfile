@@ -1,6 +1,7 @@
 FROM osrf/ros:humble-desktop-full
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/workspace
 
 SHELL ["/bin/bash", "-c"]
 
@@ -36,6 +37,7 @@ RUN uv pip compile pyproject.toml -o requirements.txt && \
     uv pip sync requirements.txt --system 
 
 COPY ./src ./src
+COPY ./schemas ./schemas
 
 RUN source /opt/ros/humble/setup.bash && colcon build --symlink-install
 

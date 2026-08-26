@@ -1,18 +1,17 @@
 import asyncio
-import threading
 import json
+import threading
 import time
-import queue
 
 import rclpy                                       # type: ignore
 from rclpy.node import Node                        # type: ignore
 from rclpy.action import ActionClient              # type: ignore
 from rclpy.executors import MultiThreadedExecutor  # type: ignore
 from std_msgs.msg import String                    # type: ignore
-from sensor_msgs.msg import Image, CompressedImage # type: ignore
 
 from robot_interfaces.action import BaseAction     # type: ignore
 from robot_interfaces.srv import GripperControl    # type: ignore
+from schemas.command_contract import LLM_ACTIONS
 
 class TaskManagerNode(Node):
     def __init__(self):
@@ -55,6 +54,7 @@ class TaskManagerNode(Node):
 
         self.executing_task = None
         self.current_target = None
+        self.active_goal_handle = None
 
         self.loop = None
         self.loop_tread = threading.Thread(target=self._run_async_loop, daemon=True)
@@ -145,13 +145,16 @@ class TaskManagerNode(Node):
             if not goal_handle.accepted:
                 self.get_logger().error("Task Manager | Robot rejected the task")
                 return False
-                        
-            self.get_logger().info("Task Manager | Robot accepted the task. Waiting for result...")
 
-            get_result_future = goal_handle.get_result_async()
-            result_response = await self._async_ros_future(get_result_future)
-
-            return result_response.result.success
+            self.active_goal_handle = goal_handle
+            try:
+                self.get_logger().info("Task Manager | Robot accepted the task. Waiting for result...")
+                get_result_future = goal_handle.get_result_async()
+                result_response = await self._async_ros_future(get_result_future)
+                return result_response.result.success
+            finally:
+                if self.active_goal_handle is goal_handle:
+                    self.active_goal_handle = None
         
         except Exception as e:
             self.get_logger().error(f"Error while sending task: {str(e)}")
@@ -208,16 +211,53 @@ class TaskManagerNode(Node):
             
             self.get_logger().info(f"Manager received new command: {cmd_obj['text']}")
 
-            for task in cmd_obj["tasks"]:
-                priority = 0 if task["action"] in ("stop", "cancel") else 1
+            tasks = cmd_obj["tasks"]
+            if any(task.get("action") == "stop" for task in tasks):
+                self.loop.call_soon_threadsafe(self._schedule_stop)
+                return
+
+            for task in tasks:
+                action = task.get("action")
+                if action not in LLM_ACTIONS:
+                    self.get_logger().error(
+                        f"Task Manager | Refusing unsupported action: {action!r}"
+                    )
+                    continue
                 timestamp = time.time()
-                payload = (priority, timestamp, task)
-                self.loop.call_soon_threadsafe(self.task_queue.put_nowait, payload)
+                payload = (1, timestamp, task)
+                self.loop.call_soon_threadsafe(self._enqueue_task, payload)
         
         except json.JSONDecodeError:
             self.get_logger().error(f"Task Manager | Received invalid JSON string in command_callback: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Task Manager | Error in command_callback: {e}")
+
+    def _enqueue_task(self, payload) -> None:
+        try:
+            self.task_queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            self.get_logger().error("Task Manager | Queue full; command was rejected")
+
+    def _schedule_stop(self) -> None:
+        asyncio.create_task(self._stop_active_task())
+
+    async def _stop_active_task(self) -> None:
+        """Cancel current robot motion and discard queued commands."""
+        while not self.task_queue.empty():
+            self.task_queue.get_nowait()
+            self.task_queue.task_done()
+
+        goal_handle = self.active_goal_handle
+        if goal_handle is None or not goal_handle.is_active:
+            self.get_logger().info("Task Manager | Stop requested; no active robot goal")
+            return
+
+        try:
+            cancel_future = goal_handle.cancel_goal_async()
+            await self._async_ros_future(cancel_future)
+            self.get_logger().warning("Task Manager | Active robot goal cancellation requested")
+        except Exception as exc:
+            self.get_logger().error(f"Task Manager | Failed to cancel active robot goal: {exc}")
     
     def _update_state(self, success: bool) -> None:
         """Update robot's state."""

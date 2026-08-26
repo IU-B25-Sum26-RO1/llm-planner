@@ -54,6 +54,21 @@ DIRECTION_VECTORS = {
     "up": np.array([0.0, 0.0, 1.0]),
     "down": np.array([0.0, 0.0, -1.0]),
 }
+ROBOT_ACTIONS = frozenset(
+    {
+        "go_home",
+        "move_to",
+        "move_to_object",
+        "pick",
+        "place",
+        *DIRECTION_VECTORS,
+    }
+)
+OBJECT_REQUIRED_ACTIONS = frozenset({"move_to_object", "pick"})
+
+
+class ActionCanceled(Exception):
+    """Raised when an action cancellation request interrupts robot motion."""
 
 
 class UR10eInterface(Node):
@@ -211,7 +226,26 @@ class UR10eInterface(Node):
                 best_q = q
         return best_q
 
-    def _send_arm_trajectory(self, target_q, min_time=2.0):
+    def _hold_current_position(self):
+        current = self._current_arm_q()
+        if current is None:
+            return
+        q_map = dict(zip(self.kin.movable_names, current))
+        traj = JointTrajectory()
+        traj.joint_names = ARM_JOINTS
+        point = JointTrajectoryPoint()
+        point.positions = [float(q_map[joint]) for joint in ARM_JOINTS]
+        point.time_from_start.nanosec = 100_000_000
+        traj.points = [point]
+        self._traj_pub.publish(traj)
+
+    def _raise_if_cancel_requested(self, goal_handle):
+        if goal_handle is not None and goal_handle.is_cancel_requested:
+            self._hold_current_position()
+            raise ActionCanceled()
+
+    def _send_arm_trajectory(self, target_q, min_time=2.0, goal_handle=None):
+        self._raise_if_cancel_requested(goal_handle)
         current = self._current_arm_q()
         q_map = dict(zip(self.kin.movable_names, target_q))
         positions = [q_map[j] for j in ARM_JOINTS]
@@ -232,7 +266,10 @@ class UR10eInterface(Node):
         traj.points = [point]
 
         self._traj_pub.publish(traj)
-        time.sleep(duration + 0.5)
+        deadline = time.monotonic() + duration + 0.5
+        while time.monotonic() < deadline:
+            self._raise_if_cancel_requested(goal_handle)
+            time.sleep(min(0.05, deadline - time.monotonic()))
 
     def _republish_gripper(self):
         msg = Float64MultiArray()
@@ -306,7 +343,7 @@ class UR10eInterface(Node):
         request.state = state
         self._set_future = self._set_state_cli.call_async(request)
 
-    def _command_gripper(self, closed: bool):
+    def _command_gripper(self, closed: bool, goal_handle=None):
         target = self.gripper_closed if closed else self.gripper_open
         with self._lock:
             start = self._joint_positions.get("left_jaw_joint", self._gripper_cmd[0])
@@ -314,6 +351,7 @@ class UR10eInterface(Node):
         steps = 30
         duration = 1.5
         for i in range(1, steps + 1):
+            self._raise_if_cancel_requested(goal_handle)
             value = start + (target - start) * (i / steps)
             self._gripper_cmd = [value, value]
             self._republish_gripper()
@@ -333,25 +371,28 @@ class UR10eInterface(Node):
         transform, _, _ = self.kin.fk(q)
         return transform
 
-    def _move_tool_to(self, position, orientation=None, position_only=False, min_time=2.0):
+    def _move_tool_to(
+        self, position, orientation=None, position_only=False, min_time=2.0, goal_handle=None
+    ):
+        self._raise_if_cancel_requested(goal_handle)
         if orientation is None:
             orientation = DOWN_ORIENTATION
         target = make_transform(orientation, np.asarray(position, dtype=float))
         target_q = self._solve_ik(target, position_only=position_only)
         if target_q is None:
             return False, f"IK failed for target {np.round(position, 3).tolist()}"
-        self._send_arm_trajectory(target_q, min_time=min_time)
+        self._send_arm_trajectory(target_q, min_time=min_time, goal_handle=goal_handle)
         return True, ""
 
-    def _go_home(self):
+    def _go_home(self, goal_handle=None):
         target_q = np.array([HOME_POSITION[j] for j in self.kin.movable_names])
-        self._send_arm_trajectory(target_q, min_time=3.0)
+        self._send_arm_trajectory(target_q, min_time=3.0, goal_handle=goal_handle)
         return True, ""
 
-    def _move_to(self, position):
-        return self._move_tool_to(position)
+    def _move_to(self, position, goal_handle=None):
+        return self._move_tool_to(position, goal_handle=goal_handle)
 
-    def _move_to_object(self, name):
+    def _move_to_object(self, name, goal_handle=None):
         obj = self._get_object_position(name)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
@@ -360,10 +401,10 @@ class UR10eInterface(Node):
             f"UR10e Interface | '{name}' at {np.round(obj, 3).tolist()}, "
             f"hovering at {np.round(target, 3).tolist()}"
         )
-        self._go_home()
-        return self._move_tool_to(target)
+        self._go_home(goal_handle=goal_handle)
+        return self._move_tool_to(target, goal_handle=goal_handle)
 
-    def _pick(self, name):
+    def _pick(self, name, goal_handle=None):
         if self._held != name:
             self._detach()
         obj = self._get_object_position(name)
@@ -371,18 +412,19 @@ class UR10eInterface(Node):
             return False, f"Object '{name}' not found in Gazebo model states"
         hover = np.array([obj[0], obj[1], obj[2] + self.hover_height])
         grasp = np.array([obj[0], obj[1], obj[2] + self.grasp_height])
-        self._command_gripper(closed=False)
-        ok, msg = self._move_tool_to(hover)
+        self._command_gripper(closed=False, goal_handle=goal_handle)
+        ok, msg = self._move_tool_to(hover, goal_handle=goal_handle)
         if not ok:
             return ok, msg
-        ok, msg = self._move_tool_to(grasp, min_time=2.0)
+        ok, msg = self._move_tool_to(grasp, min_time=2.0, goal_handle=goal_handle)
         if not ok:
             return ok, msg
-        self._command_gripper(closed=True)
-        self._attach(name)
-        return self._move_tool_to(hover, min_time=2.0)
+        self._command_gripper(closed=True, goal_handle=goal_handle)
+        if not self._attach(name):
+            return False, f"Failed to attach '{name}' to gripper"
+        return self._move_tool_to(hover, min_time=2.0, goal_handle=goal_handle)
 
-    def _place(self, name, position):
+    def _place(self, name, position, goal_handle=None):
         if position is not None:
             base = np.asarray(position, dtype=float)
         else:
@@ -392,25 +434,42 @@ class UR10eInterface(Node):
             base = obj
         hover = np.array([base[0], base[1], base[2] + self.hover_height])
         release = np.array([base[0], base[1], base[2] + self.place_height])
-        ok, msg = self._move_tool_to(hover)
+        ok, msg = self._move_tool_to(hover, goal_handle=goal_handle)
         if not ok:
             return ok, msg
-        ok, msg = self._move_tool_to(release, min_time=2.0)
+        ok, msg = self._move_tool_to(release, min_time=2.0, goal_handle=goal_handle)
         if not ok:
             return ok, msg
         self._detach()
-        self._command_gripper(closed=False)
-        return self._move_tool_to(hover, min_time=2.0)
+        self._command_gripper(closed=False, goal_handle=goal_handle)
+        return self._move_tool_to(hover, min_time=2.0, goal_handle=goal_handle)
 
-    def _jog(self, direction, distance):
+    def _jog(self, direction, distance, goal_handle=None):
         pose = self._tool_pose()
         if pose is None:
             return False, "Current tool pose unavailable"
         step = distance if distance and distance > 0.0 else self.jog_step
         target_pos = pose[:3, 3] + DIRECTION_VECTORS[direction] * step
-        return self._move_tool_to(target_pos, orientation=pose[:3, :3], min_time=1.5)
+        return self._move_tool_to(
+            target_pos, orientation=pose[:3, :3], min_time=1.5, goal_handle=goal_handle
+        )
 
     def goal_callback(self, goal_request):
+        task = goal_request.task_type
+        coordinates = (goal_request.x, goal_request.y, goal_request.z)
+        if task not in ROBOT_ACTIONS:
+            self.get_logger().warning(
+                f"UR10e Interface | Rejected unsupported task: {task!r}"
+            )
+            return GoalResponse.REJECT
+        if not all(math.isfinite(value) for value in coordinates):
+            self.get_logger().warning("UR10e Interface | Rejected non-finite target coordinates")
+            return GoalResponse.REJECT
+        if task in OBJECT_REQUIRED_ACTIONS and not goal_request.object_name.strip():
+            self.get_logger().warning(
+                f"UR10e Interface | Rejected {task} without an object name"
+            )
+            return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, cancel_request):
@@ -442,23 +501,29 @@ class UR10eInterface(Node):
 
         try:
             if task == "go_home":
-                ok, msg = self._go_home()
+                ok, msg = self._go_home(goal_handle=goal_handle)
             elif task == "move_to":
-                ok, msg = self._move_to([request.x, request.y, request.z])
+                ok, msg = self._move_to([request.x, request.y, request.z], goal_handle=goal_handle)
             elif task == "move_to_object":
-                ok, msg = self._move_to_object(request.object_name)
+                ok, msg = self._move_to_object(request.object_name, goal_handle=goal_handle)
             elif task == "pick":
-                ok, msg = self._pick(request.object_name)
+                ok, msg = self._pick(request.object_name, goal_handle=goal_handle)
             elif task == "place":
                 position = None
                 if request.x or request.y or request.z:
                     position = [request.x, request.y, request.z]
-                ok, msg = self._place(request.object_name, position)
+                ok, msg = self._place(request.object_name, position, goal_handle=goal_handle)
             elif task in DIRECTION_VECTORS:
-                ok, msg = self._jog(task, request.x)
+                ok, msg = self._jog(task, request.x, goal_handle=goal_handle)
             else:
                 ok, msg = False, f"Unexpected task: {task}"
                 self.get_logger().warn(f"UR10e Interface | {msg}")
+        except ActionCanceled:
+            goal_handle.canceled()
+            result.success = False
+            result.error_message = "Canceled"
+            self.get_logger().info("UR10e Interface | Robot stopped (canceled).")
+            return result
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Exception during '{task}': {exc}"
             self.get_logger().error(f"UR10e Interface | {msg}")

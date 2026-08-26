@@ -203,12 +203,12 @@ Use only one of these canonical actions:
 
 pick ("Возьми", "Подбери", "Захвати")
 place ("Положи")
-move_to ("Передвинься")
 open_gripper ("Отпусти [object_name]", "Разожми захват", "Отпусти")
 close_gripper ("Зажми захват", "Зажми гриппер")
 go_home ("Домой", "Вернись домой")
 stop ("Стоп", "Стой", "Остановись", "Отмена")
-unknown
+
+If a request needs an action outside this list, return type = "non_command" and no tasks.
 
 Parentheses indicate which words most often imply this action.
 
@@ -859,12 +859,8 @@ Action cannot be reliably determined.
 UNKNOWN
 ==================================================
 
-If Action cannot be determined:
-
-{
-    "action": "unknown",
-    ...
-}
+If the requested action cannot be determined or is unsupported, return a
+non_command response with an empty tasks list.
 
 ==================================================
 EXAMPLES
