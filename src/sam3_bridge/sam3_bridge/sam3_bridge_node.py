@@ -19,7 +19,7 @@ class SAM3BridgeNode(Node):
     def __init__(self):
         super().__init__('sam3_bridge_node')
         
-        self.image_sub_topic = 'camera/color/image_raw/processed'
+        self.image_sub_topic = '/camera/color/image_raw/processed'
         self.target_sub_topic = '/to_track/target'
         self.raw_mask_pub_topic = '/sam3/output/mask_raw'
 
@@ -187,7 +187,10 @@ class SAM3BridgeNode(Node):
                         target_task = asyncio.create_task(self.target_queue.get())
 
                     elif frame_task in done:
-                        msg: CompressedImage = await self.frame_queue.get()
+                        # Use the message that completed frame_task. Calling
+                        # queue.get() here would consume the next frame and
+                        # leave this completed frame unsent.
+                        msg: CompressedImage = frame_task.result()
 
                         frame_id = f"{msg.header.stamp.sec}_{msg.header.stamp.nanosec}"
                         

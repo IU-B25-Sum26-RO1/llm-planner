@@ -52,6 +52,49 @@ cp .env.example .env
 | `SAM3_SERVER_URL` | WebSocket URL сервера SAM3 |
 | `TARGET_VIDEO_FPS` / `TARGET_VIDEO_WIDTH` / `TARGET_VIDEO_HEIGHT` | Параметры видео для preprocessor |
 
+### Проверка цепочки camera → preprocessor → SAM3
+
+Стандартный входной топик — `/camera/color/image_raw`: он совпадает со
+значением `CAMERA_RAW_TOPIC` в `.env.example` и с топиком, публикуемым
+`camera_driver`. Соберите затронутые пакеты:
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --packages-select camera_driver sam3_preprocessor sam3_bridge
+source install/setup.bash
+```
+
+В трёх терминалах (каждый после `source /opt/ros/humble/setup.bash && source
+install/setup.bash`) запустите publisher, preprocessor и bridge:
+
+```bash
+ros2 run camera_driver camera_publisher
+```
+
+```bash
+CAMERA_RAW_TOPIC=/camera/color/image_raw ros2 run sam3_preprocessor preprocessor
+```
+
+```bash
+SAM3_SERVER_URL=ws://localhost:8120/websocket ros2 run sam3_bridge bridge
+```
+
+В четвёртом терминале проверьте типы и поток сообщений:
+
+```bash
+ros2 topic info -v /camera/color/image_raw
+ros2 topic info -v /camera/color/image_raw/processed
+ros2 topic echo --once /camera/color/image_raw/processed sensor_msgs/msg/CompressedImage
+```
+
+Для simulator не запускайте первый процесс: оставьте `ur10e_scene` publisher
+на `/camera/color/image_raw`. При доступном SAM3-сервере дополнительно
+проверьте выход маски:
+
+```bash
+ros2 topic echo --once /sam3/output/mask_raw sensor_msgs/msg/Image
+```
+
 ### Модель Vosk
 
 ```bash

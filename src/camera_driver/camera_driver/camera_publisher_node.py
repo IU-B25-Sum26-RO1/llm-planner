@@ -6,6 +6,10 @@ from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge
 
+
+DEFAULT_CAMERA_RAW_TOPIC = '/camera/color/image_raw'
+
+
 class CameraDriver(Node):
     def __init__(self):
         super().__init__('camera_publisher_node')
@@ -16,7 +20,9 @@ class CameraDriver(Node):
 
         fps = self.get_parameter('fps').value
 
-        self.publisher_ = self.create_publisher(Image, 'camera/image_raw', 10)
+        # Keep this aligned with CAMERA_RAW_TOPIC's documented default so the
+        # physical-camera driver can replace the simulator without remapping.
+        self.publisher_ = self.create_publisher(Image, DEFAULT_CAMERA_RAW_TOPIC, 10)
         self.cap = cv2.VideoCapture(0)
         self.bridge = CvBridge()
 
