@@ -2,6 +2,10 @@ import json
 import re
 from typing import Any
 
+from pydantic import ValidationError
+
+from schemas.output_cmd import OutputCommandSchema
+
 
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
 
@@ -36,22 +40,22 @@ def parse_llm_json(raw: str) -> dict[str, Any]:
     return parsed
 
 
-def is_valid_command_dict(data: dict[str, Any]) -> bool:
+def validate_command_dict(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize an LLM response at the system boundary."""
     if "error" in data:
+        raise ValueError("LLM response contains an error field")
+
+    try:
+        command = OutputCommandSchema.model_validate(data)
+    except ValidationError as exc:
+        raise ValueError(f"LLM JSON violates command schema: {exc}") from exc
+
+    return command.model_dump(by_alias=True)
+
+
+def is_valid_command_dict(data: dict[str, Any]) -> bool:
+    try:
+        validate_command_dict(data)
+    except ValueError:
         return False
-
-    cmd_type = data.get("type")
-    if cmd_type not in ("command", "non_command"):
-        return False
-
-    if "tasks" not in data or not isinstance(data["tasks"], list):
-        return False
-
-    if cmd_type == "non_command":
-        return True
-
-    for task in data["tasks"]:
-        if not isinstance(task, dict) or "action" not in task:
-            return False
-
     return True
