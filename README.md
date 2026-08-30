@@ -140,8 +140,8 @@ docker compose up
 |---|---|
 | `audio_processor` | Захват микрофона, распознавание речи (Vosk) |
 | `decomposer` | Декомпозиция текста командой через LLM |
-| `simulation` | Gazebo + сцена UR10e + `ur10e_interface` |
-| `ur10e_control` | Task Manager (очередь задач на робота) |
+| `simulation` | Gazebo + сцена UR10e |
+| `ur10e_control` | Task Manager и `ur10e_interface` |
 | `sam3_preprocessor` | Прокидывание/подготовка кадров камеры |
 | `sam3_bridge` | Клиент к внешнему SAM3 |
 
@@ -150,6 +150,18 @@ docker compose up
 ```bash
 docker compose down
 ```
+
+Проверка связки Task Manager → BaseAction после запуска:
+
+```bash
+docker compose exec ur10e_control \
+  bash /workspace/src/ur10e_control_system/scripts/verify_base_action.sh
+```
+
+Команда завершается с кодом 0 только когда `/execute/base_action` имеет тип
+`robot_interfaces/action/BaseAction` и в ROS-графе видны как минимум один сервер
+и один клиент (Task Manager). Эта же проверка используется как healthcheck сервиса
+`ur10e_control`.
 
 Перезапуск одного сервиса:
 
