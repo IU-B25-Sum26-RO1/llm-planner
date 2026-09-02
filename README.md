@@ -163,6 +163,21 @@ docker compose exec ur10e_control \
 и один клиент (Task Manager). Эта же проверка используется как healthcheck сервиса
 `ur10e_control`.
 
+### Smoke-тест `ur10e_control`
+
+После сборки ROS Humble-образа из корня репозитория запустите:
+
+```bash
+docker compose build && bash tests/docker-compose-control-smoke-test.sh
+```
+
+Тест запускает настоящий Compose-сервис `ur10e_control` без его внешних зависимостей,
+проверяет одновременное присутствие `task_manager_node` и `ur10e_interface`, тип и
+клиент/серверные endpoints `/execute/base_action`, затем останавливает сервис. Успех
+возможен только при чистом завершении контейнера с кодом 0. Не запускайте его, пока
+ваш рабочий `ur10e_control` уже работает: скрипт специально завершится с ошибкой,
+чтобы не прерывать текущую сессию.
+
 Перезапуск одного сервиса:
 
 ```bash
