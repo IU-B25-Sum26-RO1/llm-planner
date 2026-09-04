@@ -1,21 +1,18 @@
 [project]
 name = "llm-planner"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice-controlled UR10e manipulation with an LLM task planner"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "aiohttp>=3.14.1",
-    "dotenv>=0.9.9",
-    "fastapi>=0.138.0",
+    "httpx>=0.28.1,<1",
     "numpy<2.0.0",
     "openai>=2.44.0",
     "opencv-python-headless<4.11.0",
     "pydantic>=2.13.4",
     "sounddevice>=0.5.5",
-    "soundfile>=0.14.0",
-    "uvicorn>=0.49.0",
-    "vosk>=0.3.45",
+    "vosk>=0.3.45; sys_platform == 'linux'",
 ]
 
 [dependency-groups]
@@ -23,3 +20,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.15.18",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

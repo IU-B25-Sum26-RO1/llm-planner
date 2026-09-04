@@ -1,0 +1,5 @@
+# Deterministic microphone-free inputs for the ROS text-to-plan boundary.
+Возьми зелёный куб.
+Возьми зелёный куб и положи его на белый поднос.
+Вернись домой.
+Остановись.

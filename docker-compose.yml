@@ -11,17 +11,17 @@ services:
     ipc: host
 
     environment:
-      - VOSK_MODEL=${VOSK_MODEL}
-      - AUDIO_SAMPLERATE=${AUDIO_SAMPLERATE}
-      - AUDIO_BLOCK_SIZE=${AUDIO_BLOCK_SIZE}
+      - VOSK_MODEL=${VOSK_MODEL:-vosk-model-small-ru-0.22}
+      - AUDIO_SAMPLERATE=${AUDIO_SAMPLERATE:-16000}
+      - AUDIO_BLOCK_SIZE=${AUDIO_BLOCK_SIZE:-4000}
 
-      - PULSE_SERVER=${PULSE_SERVER}
-      - AUDIO_DEVICE=${AUDIO_DEVICE}
+      - PULSE_SERVER=${PULSE_SERVER:-unix:/mnt/wslg/PulseServer}
+      - AUDIO_DEVICE=${AUDIO_DEVICE:-default}
       # - XDG_RUNTIME_DIR=/tmp
       # - PULSE_COOKIE=/tmp/pulse-cookie-dir/cookie
     volumes:
       - /dev/shm:/dev/shm
-      - ${HOST_VOSK_MODELS_PATH}:/workspace/models
+      - ${HOST_VOSK_MODELS_PATH:-./models}:/workspace/models
       - ./src:/workspace/src
 
       # - ${HOST_PULSE_SOCKET_PATH:-/run/user/1000/pulse}:/tmp/pulse
@@ -48,10 +48,10 @@ services:
     #   - "host.docker.internal:host-gateway"
 
     environment:
-      - LLM_API_URL=${LLM_API_URL}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_MODEL=${LLM_MODEL}
-      - SYS_PROMPT_PATH=${SYS_PROMPT_PATH}
+      - LLM_API_URL=${LLM_API_URL:-http://host.docker.internal:8000/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-not-needed}
+      - LLM_MODEL=${LLM_MODEL:-Qwen/Qwen2.5-3B-Instruct}
+      - SYS_PROMPT_PATH=${SYS_PROMPT_PATH:-/workspace/prompts/decomposer_system_prompt.txt}
     volumes:
       - /dev/shm:/dev/shm
       - ./src:/workspace/src
@@ -84,9 +84,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
 
-      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS}
-      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH}
-      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT}
+      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS:-10}
+      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH:-640}
+      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT:-480}
 
     volumes:
       - /dev/shm:/dev/shm
@@ -113,10 +113,10 @@ services:
     ipc: host
 
     environment:
-      - CAMERA_RAW_TOPIC=${CAMERA_RAW_TOPIC}
-      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS}
-      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH}
-      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT}
+      - CAMERA_RAW_TOPIC=${CAMERA_RAW_TOPIC:-/camera/color/image_raw}
+      - TARGET_VIDEO_FPS=${TARGET_VIDEO_FPS:-10}
+      - TARGET_VIDEO_WIDTH=${TARGET_VIDEO_WIDTH:-640}
+      - TARGET_VIDEO_HEIGHT=${TARGET_VIDEO_HEIGHT:-480}
 
     volumes:
       - /dev/shm:/dev/shm
@@ -134,7 +134,7 @@ services:
     ipc: host
 
     environment:
-      - SAM3_SERVER_URL=${SAM3_SERVER_URL}
+      - SAM3_SERVER_URL=${SAM3_SERVER_URL:-ws://host.docker.internal:8120/websocket}
     
     volumes:
       - /dev/shm:/dev/shm

@@ -5,7 +5,6 @@ from rclpy.action import ActionClient  # type: ignore
 from rclpy.node import Node  # type: ignore
 
 from robot_interfaces.action import BaseAction  # type: ignore
-from robot_interfaces.srv import GripperControl  # type: ignore
 
 
 DIRECTIONS = {"forward", "backward", "left", "right", "up", "down"}
@@ -25,9 +24,6 @@ class CommandSender(Node):
     def __init__(self):
         super().__init__("ur10e_cli")
         self._action_client = ActionClient(self, BaseAction, "/execute/base_action")
-        self._gripper_client = self.create_client(
-            GripperControl, "/execute/gripper_control"
-        )
 
     def send_action(self, task_type, object_name="", x=0.0, y=0.0, z=0.0):
         if not self._action_client.wait_for_server(timeout_sec=10.0):
@@ -60,26 +56,12 @@ class CommandSender(Node):
     def _feedback_cb(self, feedback_msg):
         self.get_logger().info(f"Feedback: {feedback_msg.feedback.current_state}")
 
-    def send_gripper_command(self, activate):
-        if not self._gripper_client.wait_for_service(timeout_sec=10.0):
-            self.get_logger().error("Gripper service /execute/gripper_control unavailable")
-            return False
-        request = GripperControl.Request()
-        request.activate = activate
-        future = self._gripper_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        response = future.result()
-        if response is None:
-            self.get_logger().error("Gripper service returned no response")
-            return False
-        return response.success
-
-
 def _parse_and_run(node: CommandSender, argv):
     command = argv[0]
 
     if command in ("grasp", "release"):
-        return node.send_gripper_command(activate=command == "grasp")
+        action = "close_gripper" if command == "grasp" else "open_gripper"
+        return node.send_action(action)
 
     if command == "home":
         return node.send_action("go_home")

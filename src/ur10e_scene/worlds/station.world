@@ -41,6 +41,21 @@
       </link>
     </model>
 
+    <!-- Named placement target used by the documented pick/place demo. -->
+    <model name="white_tray">
+      <static>true</static>
+      <pose>0.25 0.25 0.81 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.24 0.18 0.02</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.24 0.18 0.02</size></box></geometry>
+          <material><script><uri>file://media/materials/scripts/gazebo.material</uri><name>Gazebo/White</name></script></material>
+        </visual>
+      </link>
+    </model>
+
     <!-- Small 45-45-90 wedge ramp from 3 flat plates, near +Y table edge opposite the cubes -->
     <model name="ramp">
       <pose>0.25 0.4 1.95 0 0 0</pose>
@@ -137,7 +152,7 @@
     </model>
 
     <!-- Light 3-cube pyramid on the right (-Y) of the manipulator -->
-    <model name="pyramid_cube_1">
+    <model name="green_cube">
       <pose>0.225 -0.35 0.825 0 0 0</pose>
       <link name="link">
         <inertial>
@@ -164,7 +179,7 @@
       </link>
     </model>
 
-    <model name="pyramid_cube_2">
+    <model name="blue_cube">
       <pose>0.275 -0.35 0.825 0 0 0</pose>
       <link name="link">
         <inertial>
@@ -191,7 +206,7 @@
       </link>
     </model>
 
-    <model name="pyramid_cube_3">
+    <model name="red_cube">
       <pose>0.25 -0.35 0.875 0 0 0</pose>
       <link name="link">
         <inertial>

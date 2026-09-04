@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -8,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src" / "decomposer"))
 
-from decomposer.json_utils import validate_command_dict
+from decomposer.json_utils import validate_command_dict  # noqa: E402
+from schemas.command_contract import LLM_ACTIONS  # noqa: E402
+from schemas.output_cmd import SUPPORTED_ACTIONS  # noqa: E402
 
 
 def _object(prompt="green cube"):
@@ -94,3 +97,25 @@ def test_unknown_fields_are_rejected():
     }
     with pytest.raises(ValueError):
         validate_command_dict(_command(task))
+
+
+def test_schema_action_literal_matches_canonical_contract():
+    assert frozenset(get_args(SUPPORTED_ACTIONS)) == LLM_ACTIONS
+
+
+def test_task_modifiers_are_restricted_to_supported_values():
+    valid = {
+        "action": "go_home",
+        "target": None,
+        "placement": None,
+        "modifiers": {"speed": "slow", "precision": "high"},
+        "confidence": 1.0,
+    }
+    assert validate_command_dict(_command(valid))["tasks"][0]["modifiers"] == {
+        "speed": "slow",
+        "precision": "high",
+    }
+
+    invalid = {**valid, "modifiers": {"speed": "maximum", "precision": "high"}}
+    with pytest.raises(ValueError):
+        validate_command_dict(_command(invalid))

@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'audio_processor = audio_processor.audio_processor_node:main',
+            'text_replay = audio_processor.text_replay_node:main',
         ],
     },
 )

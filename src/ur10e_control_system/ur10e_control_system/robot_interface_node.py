@@ -56,6 +56,8 @@ DIRECTION_VECTORS = {
 }
 ROBOT_ACTIONS = frozenset(
     {
+        "open_gripper",
+        "close_gripper",
         "go_home",
         "move_to",
         "move_to_object",
@@ -65,6 +67,18 @@ ROBOT_ACTIONS = frozenset(
     }
 )
 OBJECT_REQUIRED_ACTIONS = frozenset({"move_to_object", "pick"})
+DEFAULT_WORKSPACE_MIN = np.array([-0.8, -0.8, 0.78])
+DEFAULT_WORKSPACE_MAX = np.array([0.8, 0.8, 1.8])
+DEFAULT_JOINT_GOAL_TOLERANCE = 0.05
+DEFAULT_MAX_MOVE_SPEED = 1.0
+SPEED_MULTIPLIERS = {"": 1.0, "slow": 0.5, "normal": 1.0, "fast": 1.5}
+PRECISION_TOLERANCE_MULTIPLIERS = {
+    "": 1.0,
+    "low": 2.0,
+    "normal": 1.0,
+    "high": 0.5,
+}
+PRECISION_SPEED_MULTIPLIERS = {"": 1.0, "low": 1.0, "normal": 1.0, "high": 0.75}
 
 
 class ActionCanceled(Exception):
@@ -83,7 +97,11 @@ class UR10eInterface(Node):
         self.declare_parameter("gripper_closed", 0.045)
         self.declare_parameter("gripper_hold", 0.04)
         self.declare_parameter("move_speed", 0.6)
+        self.declare_parameter("max_move_speed", DEFAULT_MAX_MOVE_SPEED)
         self.declare_parameter("tip_link", "tool0")
+        self.declare_parameter("workspace_min", DEFAULT_WORKSPACE_MIN.tolist())
+        self.declare_parameter("workspace_max", DEFAULT_WORKSPACE_MAX.tolist())
+        self.declare_parameter("joint_goal_tolerance", DEFAULT_JOINT_GOAL_TOLERANCE)
 
         self.hover_height = self.get_parameter("hover_height").value
         self.grasp_height = self.get_parameter("grasp_height").value
@@ -93,12 +111,35 @@ class UR10eInterface(Node):
         self.gripper_closed = self.get_parameter("gripper_closed").value
         self.gripper_hold = self.get_parameter("gripper_hold").value
         self.move_speed = self.get_parameter("move_speed").value
+        self.max_move_speed = self.get_parameter("max_move_speed").value
         self.tip_link = self.get_parameter("tip_link").value
+        self.workspace_min = np.asarray(
+            self.get_parameter("workspace_min").value, dtype=float
+        )
+        self.workspace_max = np.asarray(
+            self.get_parameter("workspace_max").value, dtype=float
+        )
+        self.joint_goal_tolerance = float(
+            self.get_parameter("joint_goal_tolerance").value
+        )
+        if (
+            self.workspace_min.shape != (3,)
+            or self.workspace_max.shape != (3,)
+            or np.any(self.workspace_min >= self.workspace_max)
+            or self.joint_goal_tolerance <= 0.0
+            or self.move_speed <= 0.0
+            or self.max_move_speed <= 0.0
+            or self.move_speed > self.max_move_speed
+        ):
+            raise ValueError("Invalid workspace, speed, or joint-goal tolerance parameters")
 
         self._lock = threading.Lock()
+        self._execution_lock = threading.Lock()
         self._joint_positions = {}
         self._model_poses = {}
         self.kin = None
+        self._active_speed = ""
+        self._active_precision = ""
 
         cb_group = ReentrantCallbackGroup()
 
@@ -184,9 +225,10 @@ class UR10eInterface(Node):
                 [self._joint_positions[j] for j in self.kin.movable_names], dtype=float
             )
 
-    def _get_object_position(self, name, timeout=5.0):
+    def _get_object_position(self, name, timeout=5.0, goal_handle=None):
         deadline = time.time() + timeout
         while True:
+            self._raise_if_cancel_requested(goal_handle)
             with self._lock:
                 pose = self._model_poses.get(name)
             if pose is not None:
@@ -195,9 +237,10 @@ class UR10eInterface(Node):
                 return None
             time.sleep(0.1)
 
-    def _wait_for_prerequisites(self, timeout=10.0):
+    def _wait_for_prerequisites(self, timeout=10.0, goal_handle=None):
         deadline = time.time() + timeout
         while time.time() < deadline:
+            self._raise_if_cancel_requested(goal_handle)
             if self.kin is not None and self._current_arm_q() is not None:
                 return True
             time.sleep(0.1)
@@ -244,6 +287,21 @@ class UR10eInterface(Node):
             self._hold_current_position()
             raise ActionCanceled()
 
+    def _effective_move_speed(self):
+        return min(
+            getattr(self, "max_move_speed", DEFAULT_MAX_MOVE_SPEED),
+            self.move_speed
+            * SPEED_MULTIPLIERS[getattr(self, "_active_speed", "")]
+            * PRECISION_SPEED_MULTIPLIERS[getattr(self, "_active_precision", "")],
+        )
+
+    def _effective_joint_tolerance(self):
+        return getattr(
+            self, "joint_goal_tolerance", DEFAULT_JOINT_GOAL_TOLERANCE
+        ) * PRECISION_TOLERANCE_MULTIPLIERS[
+            getattr(self, "_active_precision", "")
+        ]
+
     def _send_arm_trajectory(self, target_q, min_time=2.0, goal_handle=None):
         self._raise_if_cancel_requested(goal_handle)
         current = self._current_arm_q()
@@ -255,7 +313,8 @@ class UR10eInterface(Node):
             max_delta = max(abs(q_map[j] - cur_map[j]) for j in ARM_JOINTS)
         else:
             max_delta = math.pi
-        duration = max(min_time, max_delta / max(self.move_speed, 1e-3))
+        effective_speed = self._effective_move_speed()
+        duration = max(min_time, max_delta / max(effective_speed, 1e-3))
 
         traj = JointTrajectory()
         traj.joint_names = ARM_JOINTS
@@ -269,7 +328,20 @@ class UR10eInterface(Node):
         deadline = time.monotonic() + duration + 0.5
         while time.monotonic() < deadline:
             self._raise_if_cancel_requested(goal_handle)
-            time.sleep(min(0.05, deadline - time.monotonic()))
+            time.sleep(max(0.0, min(0.05, deadline - time.monotonic())))
+
+        actual = self._current_arm_q()
+        if actual is None:
+            raise RuntimeError("Joint state unavailable after trajectory execution")
+        actual_map = dict(zip(self.kin.movable_names, actual))
+        max_error = max(
+            abs(actual_map[joint] - q_map[joint]) for joint in ARM_JOINTS
+        )
+        tolerance = self._effective_joint_tolerance()
+        if max_error > tolerance:
+            raise RuntimeError(
+                f"Trajectory did not reach its goal (max joint error {max_error:.3f} rad)"
+            )
 
     def _republish_gripper(self):
         msg = Float64MultiArray()
@@ -375,9 +447,19 @@ class UR10eInterface(Node):
         self, position, orientation=None, position_only=False, min_time=2.0, goal_handle=None
     ):
         self._raise_if_cancel_requested(goal_handle)
+        position = np.asarray(position, dtype=float)
+        workspace_min = getattr(self, "workspace_min", DEFAULT_WORKSPACE_MIN)
+        workspace_max = getattr(self, "workspace_max", DEFAULT_WORKSPACE_MAX)
+        if (
+            position.shape != (3,)
+            or not np.all(np.isfinite(position))
+            or np.any(position < workspace_min)
+            or np.any(position > workspace_max)
+        ):
+            return False, f"Target outside configured workspace: {position.tolist()}"
         if orientation is None:
             orientation = DOWN_ORIENTATION
-        target = make_transform(orientation, np.asarray(position, dtype=float))
+        target = make_transform(orientation, position)
         target_q = self._solve_ik(target, position_only=position_only)
         if target_q is None:
             return False, f"IK failed for target {np.round(position, 3).tolist()}"
@@ -393,7 +475,7 @@ class UR10eInterface(Node):
         return self._move_tool_to(position, goal_handle=goal_handle)
 
     def _move_to_object(self, name, goal_handle=None):
-        obj = self._get_object_position(name)
+        obj = self._get_object_position(name, goal_handle=goal_handle)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
         target = np.array([obj[0], obj[1], obj[2] + self.hover_height])
@@ -407,7 +489,7 @@ class UR10eInterface(Node):
     def _pick(self, name, goal_handle=None):
         if self._held != name:
             self._detach()
-        obj = self._get_object_position(name)
+        obj = self._get_object_position(name, goal_handle=goal_handle)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
         hover = np.array([obj[0], obj[1], obj[2] + self.hover_height])
@@ -425,10 +507,12 @@ class UR10eInterface(Node):
         return self._move_tool_to(hover, min_time=2.0, goal_handle=goal_handle)
 
     def _place(self, name, position, goal_handle=None):
+        if self._held is None:
+            return False, "Cannot place because the gripper is not holding an object"
         if position is not None:
             base = np.asarray(position, dtype=float)
         else:
-            obj = self._get_object_position(name)
+            obj = self._get_object_position(name, goal_handle=goal_handle)
             if obj is None:
                 return False, f"Place target '{name}' not found in Gazebo model states"
             base = obj
@@ -470,6 +554,18 @@ class UR10eInterface(Node):
                 f"UR10e Interface | Rejected {task} without an object name"
             )
             return GoalResponse.REJECT
+        speed = getattr(goal_request, "speed", "")
+        precision = getattr(goal_request, "precision", "")
+        if speed not in SPEED_MULTIPLIERS or precision not in PRECISION_TOLERANCE_MULTIPLIERS:
+            self.get_logger().warning(
+                f"UR10e Interface | Rejected invalid modifiers: "
+                f"speed={speed!r} precision={precision!r}"
+            )
+            return GoalResponse.REJECT
+        execution_lock = getattr(self, "_execution_lock", None)
+        if execution_lock is not None and execution_lock.locked():
+            self.get_logger().warning("UR10e Interface | Rejected goal while robot is busy")
+            return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, cancel_request):
@@ -482,6 +578,22 @@ class UR10eInterface(Node):
         goal_handle.publish_feedback(feedback)
 
     def execute_callback(self, goal_handle):
+        if not self._execution_lock.acquire(blocking=False):
+            result = BaseAction.Result()
+            result.success = False
+            result.error_message = "Robot is already executing another action"
+            goal_handle.abort()
+            return result
+        self._active_speed = getattr(goal_handle.request, "speed", "")
+        self._active_precision = getattr(goal_handle.request, "precision", "")
+        try:
+            return self._execute_goal(goal_handle)
+        finally:
+            self._active_speed = ""
+            self._active_precision = ""
+            self._execution_lock.release()
+
+    def _execute_goal(self, goal_handle):
         request = goal_handle.request
         task = request.task_type
         result = BaseAction.Result()
@@ -491,16 +603,24 @@ class UR10eInterface(Node):
             f"xyz=({request.x:.3f}, {request.y:.3f}, {request.z:.3f})"
         )
 
-        if not self._wait_for_prerequisites():
-            goal_handle.abort()
-            result.success = False
-            result.error_message = "Kinematics or joint states not available yet"
-            return result
-
-        self._publish_feedback(goal_handle, f"running:{task}")
-
         try:
-            if task == "go_home":
+            self._wait_for_prerequisites(goal_handle=goal_handle)
+            if self.kin is None or self._current_arm_q() is None:
+                goal_handle.abort()
+                result.success = False
+                result.error_message = "Kinematics or joint states not available yet"
+                return result
+
+            self._publish_feedback(goal_handle, f"running:{task}")
+
+            if task == "open_gripper":
+                self._detach()
+                self._command_gripper(closed=False, goal_handle=goal_handle)
+                ok, msg = True, ""
+            elif task == "close_gripper":
+                self._command_gripper(closed=True, goal_handle=goal_handle)
+                ok, msg = True, ""
+            elif task == "go_home":
                 ok, msg = self._go_home(goal_handle=goal_handle)
             elif task == "move_to":
                 ok, msg = self._move_to([request.x, request.y, request.z], goal_handle=goal_handle)
@@ -549,6 +669,12 @@ class UR10eInterface(Node):
         return result
 
     def gripper_callback(self, request, response):
+        if not self._execution_lock.acquire(blocking=False):
+            self.get_logger().warning(
+                "UR10e Interface | Rejected gripper service request while robot is busy"
+            )
+            response.success = False
+            return response
         try:
             if request.activate:
                 self._attach_nearest(max_dist=0.03)
@@ -559,6 +685,8 @@ class UR10eInterface(Node):
             self.get_logger().error(f"UR10e Interface | Unexpected gripper error: {exc}")
             response.success = False
             return response
+        finally:
+            self._execution_lock.release()
         response.success = True
         return response
 

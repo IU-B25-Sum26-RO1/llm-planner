@@ -19,15 +19,12 @@ def _install_ros_stubs(monkeypatch):
     robot_interfaces = types.ModuleType("robot_interfaces")
     robot_interfaces.action = types.ModuleType("robot_interfaces.action")
     robot_interfaces.action.BaseAction = type("BaseAction", (), {})
-    robot_interfaces.srv = types.ModuleType("robot_interfaces.srv")
-    robot_interfaces.srv.GripperControl = type("GripperControl", (), {})
 
     monkeypatch.setitem(sys.modules, "rclpy", rclpy)
     monkeypatch.setitem(sys.modules, "rclpy.action", rclpy.action)
     monkeypatch.setitem(sys.modules, "rclpy.node", rclpy.node)
     monkeypatch.setitem(sys.modules, "robot_interfaces", robot_interfaces)
     monkeypatch.setitem(sys.modules, "robot_interfaces.action", robot_interfaces.action)
-    monkeypatch.setitem(sys.modules, "robot_interfaces.srv", robot_interfaces.srv)
 
 
 def test_cli_maps_home_and_gripper_commands_to_supported_interfaces(monkeypatch):
@@ -38,7 +35,6 @@ def test_cli_maps_home_and_gripper_commands_to_supported_interfaces(monkeypatch)
     calls = []
     node = types.SimpleNamespace(
         send_action=lambda *args, **kwargs: calls.append(("action", args, kwargs)) or True,
-        send_gripper_command=lambda **kwargs: calls.append(("gripper", (), kwargs)) or True,
         get_logger=lambda: types.SimpleNamespace(error=lambda *args: None),
     )
 
@@ -48,6 +44,6 @@ def test_cli_maps_home_and_gripper_commands_to_supported_interfaces(monkeypatch)
 
     assert calls == [
         ("action", ("go_home",), {}),
-        ("gripper", (), {"activate": True}),
-        ("gripper", (), {"activate": False}),
+        ("action", ("close_gripper",), {}),
+        ("action", ("open_gripper",), {}),
     ]
