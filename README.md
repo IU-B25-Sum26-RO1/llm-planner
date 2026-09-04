@@ -1,5 +1,7 @@
 # LLM Planner
 
+[English documentation](README.en.md)
+
 Голосовое и текстовое управление роботом UR10e: LLM разбивает команду оператора на примитивы, которые исполняются в симуляции Gazebo (ROS 2 Humble).
 
 Пайплайн: микрофон → Vosk → LLM-декомпозиция → Task Manager → UR10e Interface / Gazebo. Опционально: кадры камеры → SAM3.
