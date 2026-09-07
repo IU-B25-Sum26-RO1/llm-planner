@@ -32,8 +32,10 @@ WORKDIR /workspace
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv pip compile pyproject.toml -o requirements.txt && \
-    uv pip sync requirements.txt --system 
+RUN uv pip compile pyproject.toml -o requirements.txt --emit-index-url && \
+    uv pip sync requirements.txt --system \
+      --index https://download.pytorch.org/whl/cpu \
+      --index-strategy unsafe-best-match
 
 COPY ./src ./src
 

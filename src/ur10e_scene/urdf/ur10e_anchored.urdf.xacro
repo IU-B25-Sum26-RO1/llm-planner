@@ -57,7 +57,12 @@
   </joint>
   <xacro:include filename="$(find ur10e_scene)/urdf/realsense_d435.xacro" />
 
-  <xacro:realsense_d435 parent="world">
+  <xacro:realsense_d435 parent="world" prefix="camera" ros_namespace="camera" camera_name="camera">
     <origin xyz="0 0 1.8" rpy="0 1.57079632679 0" />
+  </xacro:realsense_d435>
+
+  <!-- Front overview RGB-D camera for perception experiments on the full manipulator table. -->
+  <xacro:realsense_d435 parent="world" prefix="front_camera" ros_namespace="front_camera" camera_name="camera">
+    <origin xyz="0.95 0.0 1.30" rpy="0 0.50 3.14159265359" />
   </xacro:realsense_d435>
 </robot>

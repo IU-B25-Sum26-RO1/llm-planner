@@ -35,6 +35,7 @@ class PreprocessorNode(Node):
 
         self.sub = self.create_subscription(Image, sub_topic, self.callback, 10)
         self.pub = self.create_publisher(CompressedImage, pub_topic, 10)
+        self.bridge = CvBridge()
 
         self.get_logger().info(
             f"PreprocessorNode | Listening to {sub_topic}; publishing {self.target_width}x"

@@ -14,7 +14,7 @@ class CameraDriver(Node):
 
         self.declare_parameter('fps', env_fps)
 
-        fps = self.get_parameter('fps').value
+        fps = int(self.get_parameter('fps').value)
 
         self.publisher_ = self.create_publisher(Image, 'camera/image_raw', 10)
         self.cap = cv2.VideoCapture(0)

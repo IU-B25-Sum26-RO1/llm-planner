@@ -187,7 +187,7 @@ class SAM3BridgeNode(Node):
                         target_task = asyncio.create_task(self.target_queue.get())
 
                     elif frame_task in done:
-                        msg: CompressedImage = await self.frame_queue.get()
+                        msg: CompressedImage = frame_task.result()
 
                         frame_id = f"{msg.header.stamp.sec}_{msg.header.stamp.nanosec}"
                         

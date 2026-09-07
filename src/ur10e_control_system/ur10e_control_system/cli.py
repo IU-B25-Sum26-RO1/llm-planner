@@ -64,7 +64,7 @@ def _parse_and_run(node: CommandSender, argv):
         return node.send_action(command)
 
     if command == "home":
-        return node.send_action("home")
+        return node.send_action("go_home")
 
     if command == "move_to_object":
         if len(argv) < 2:

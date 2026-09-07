@@ -67,6 +67,7 @@ class UR10eInterface(Node):
         self.declare_parameter("gripper_open", 0.0)
         self.declare_parameter("gripper_closed", 0.045)
         self.declare_parameter("gripper_hold", 0.04)
+        self.declare_parameter("coordinate_attach_max_dist", 0.20)
         self.declare_parameter("move_speed", 0.6)
         self.declare_parameter("tip_link", "tool0")
 
@@ -77,6 +78,7 @@ class UR10eInterface(Node):
         self.gripper_open = self.get_parameter("gripper_open").value
         self.gripper_closed = self.get_parameter("gripper_closed").value
         self.gripper_hold = self.get_parameter("gripper_hold").value
+        self.coordinate_attach_max_dist = self.get_parameter("coordinate_attach_max_dist").value
         self.move_speed = self.get_parameter("move_speed").value
         self.tip_link = self.get_parameter("tip_link").value
 
@@ -255,11 +257,14 @@ class UR10eInterface(Node):
         self.get_logger().info(f"UR10e Interface | Attached '{name}' to gripper")
         return True
 
-    def _attach_nearest(self, max_dist=0.15):
-        tool = self._tool_pose()
-        if tool is None:
-            return False
-        p = tool[:3, 3]
+    def _attach_nearest(self, max_dist=0.15, reference_position=None):
+        if reference_position is None:
+            tool = self._tool_pose()
+            if tool is None:
+                return False
+            p = tool[:3, 3]
+        else:
+            p = np.asarray(reference_position, dtype=float)
         with self._lock:
             items = [(n, po) for n, po in self._model_poses.items()]
         best, best_d = None, max_dist
@@ -351,24 +356,47 @@ class UR10eInterface(Node):
     def _move_to(self, position):
         return self._move_tool_to(position)
 
-    def _move_to_object(self, name):
-        obj = self._get_object_position(name)
+    def _goal_position(self, request):
+        if request.x or request.y or request.z:
+            return [request.x, request.y, request.z]
+        return None
+
+    def _move_to_object(self, name, position=None):
+        if position is None:
+            if not name:
+                return False, "Move target requires object_name or xyz coordinates"
+            obj = self._get_object_position(name)
+            if obj is None:
+                return False, f"Object '{name}' not found in Gazebo model states"
+        else:
+            obj = np.asarray(position, dtype=float)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
         target = np.array([obj[0], obj[1], obj[2] + self.hover_height])
         self.get_logger().info(
-            f"UR10e Interface | '{name}' at {np.round(obj, 3).tolist()}, "
+            f"UR10e Interface | '{name or 'xyz target'}' at {np.round(obj, 3).tolist()}, "
             f"hovering at {np.round(target, 3).tolist()}"
         )
         self._go_home()
         return self._move_tool_to(target)
 
-    def _pick(self, name):
-        if self._held != name:
+    def _pick(self, name, position=None):
+        if name and self._held != name:
             self._detach()
-        obj = self._get_object_position(name)
+        elif not name:
+            self._detach()
+
+        if position is None:
+            if not name:
+                return False, "Pick target requires object_name or xyz coordinates"
+            obj = self._get_object_position(name)
+            if obj is None:
+                return False, f"Object '{name}' not found in Gazebo model states"
+        else:
+            obj = np.asarray(position, dtype=float)
         if obj is None:
             return False, f"Object '{name}' not found in Gazebo model states"
+
         hover = np.array([obj[0], obj[1], obj[2] + self.hover_height])
         grasp = np.array([obj[0], obj[1], obj[2] + self.grasp_height])
         self._command_gripper(closed=False)
@@ -379,7 +407,14 @@ class UR10eInterface(Node):
         if not ok:
             return ok, msg
         self._command_gripper(closed=True)
-        self._attach(name)
+        if name:
+            if not self._attach(name):
+                return False, f"Failed to attach '{name}'"
+        elif not self._attach_nearest(
+            max_dist=self.coordinate_attach_max_dist,
+            reference_position=obj,
+        ):
+            return False, "No Gazebo object close enough to attach after coordinate pick"
         return self._move_tool_to(hover, min_time=2.0)
 
     def _place(self, name, position):
@@ -446,9 +481,12 @@ class UR10eInterface(Node):
             elif task == "move_to":
                 ok, msg = self._move_to([request.x, request.y, request.z])
             elif task == "move_to_object":
-                ok, msg = self._move_to_object(request.object_name)
+                ok, msg = self._move_to_object(
+                    request.object_name,
+                    self._goal_position(request),
+                )
             elif task == "pick":
-                ok, msg = self._pick(request.object_name)
+                ok, msg = self._pick(request.object_name, self._goal_position(request))
             elif task == "place":
                 position = None
                 if request.x or request.y or request.z:

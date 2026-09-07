@@ -3,16 +3,19 @@ import threading
 import json
 import time
 import queue
+import os
 
 import rclpy                                       # type: ignore
 from rclpy.node import Node                        # type: ignore
 from rclpy.action import ActionClient              # type: ignore
 from rclpy.executors import MultiThreadedExecutor  # type: ignore
 from std_msgs.msg import String                    # type: ignore
+from geometry_msgs.msg import PoseStamped          # type: ignore
 from sensor_msgs.msg import Image, CompressedImage # type: ignore
 
 from robot_interfaces.action import BaseAction     # type: ignore
 from robot_interfaces.srv import GripperControl    # type: ignore
+from ur10e_control_system.scene_object_resolver import resolve_target_model_name
 
 class TaskManagerNode(Node):
     def __init__(self):
@@ -20,9 +23,27 @@ class TaskManagerNode(Node):
         
         json_command_topic = 'decomposer/json_output/command'
         target_tracker_topic = '/to_track/target'
+        target_pose_topic = os.environ.get(
+            'PERCEPTION_TARGET_POSE_TOPIC',
+            '/perception/target_pose'
+        )
 
         base_action_topic = '/execute/base_action'
         gripper_control_topic = '/execute/gripper_control'
+
+        self.target_source_mode = os.environ.get('TARGET_SOURCE_MODE', 'auto').strip().lower()
+        if self.target_source_mode not in ('auto', 'perception', 'simulation'):
+            self.get_logger().warn(
+                f"Task Manager | Invalid TARGET_SOURCE_MODE='{self.target_source_mode}', using 'auto'"
+            )
+            self.target_source_mode = 'auto'
+        self.perception_target_timeout = float(
+            os.environ.get('PERCEPTION_TARGET_TIMEOUT', '5.0')
+        )
+        self.target_pose_topic = target_pose_topic
+        self._target_pose_lock = threading.Lock()
+        self._latest_target_pose = None
+        self._latest_target_pose_received_at = 0.0
 
         self.cmd_sub = self.create_subscription(
             String,
@@ -35,6 +56,13 @@ class TaskManagerNode(Node):
             String,
             target_tracker_topic,
             1
+        )
+
+        self.target_pose_sub = self.create_subscription(
+            PoseStamped,
+            target_pose_topic,
+            self._target_pose_callback,
+            10
         )
 
         self.task_queue = None
@@ -59,6 +87,12 @@ class TaskManagerNode(Node):
         self.loop = None
         self.loop_tread = threading.Thread(target=self._run_async_loop, daemon=True)
         self.loop_tread.start()
+
+        self.get_logger().info(
+            "Task Manager | Target source mode: "
+            f"{self.target_source_mode}; perception pose topic: {target_pose_topic}; "
+            f"timeout: {self.perception_target_timeout:.1f}s"
+        )
     
     def _run_async_loop(self) -> None:
         self.loop = asyncio.new_event_loop()
@@ -94,6 +128,7 @@ class TaskManagerNode(Node):
 
                 target_msg = String()
                 target_msg.data = json.dumps(self.current_target)
+                target_requested_at = time.monotonic()
                 self.current_target_pub.publish(target_msg)
                 
                 if action == "open_gripper":
@@ -101,7 +136,7 @@ class TaskManagerNode(Node):
                 elif action == "close_gripper":
                     success = await self.send_gripper_command(activate=True)
                 else:
-                    success = await self.send_task_to_robot(task)
+                    success = await self.send_task_to_robot(task, target_requested_at)
             
                 if success:
                     self.get_logger().info("Task Manager | Task successfully completed")
@@ -133,10 +168,12 @@ class TaskManagerNode(Node):
             self.get_logger().error(f"Task Manager | Error while sending gripper command: {str(e)}")
             return False
 
-    async def send_task_to_robot(self, task):
+    async def send_task_to_robot(self, task, target_requested_at=None):
         try:
             self.get_logger().info(f"Task Manager | Received task: {task['id']} ({task['action']})")
-            goal_msg = self.create_goal_msg(task)
+            goal_msg = await self.create_goal_msg(task, target_requested_at)
+            if goal_msg is None:
+                return False
 
             send_goal_future = self.action_client.send_goal_async(goal_msg)
             
@@ -161,7 +198,7 @@ class TaskManagerNode(Node):
         rclpy.spin_until_future_complete(self, rclpy_future)
         return rclpy_future.result()
     
-    def create_goal_msg(self, task: dict):
+    async def create_goal_msg(self, task: dict, target_requested_at=None):
         goal_msg = BaseAction.Goal()
         
         goal_msg.x = 0.0
@@ -172,14 +209,74 @@ class TaskManagerNode(Node):
         task_type = task["action"]
 
         if task_type == "place":
-            object_name = "_".join(task["placement"]["reference"]["object"]["prompt"].split())
+            target = task["placement"]["reference"]
+            object_name = await self._fill_goal_target(goal_msg, target, target_requested_at)
+            if object_name is None:
+                return None
         elif task_type == "pick":
-            object_name = "_".join(task["target"]["object"]["prompt"].split())
+            target = task["target"]
+            object_name = await self._fill_goal_target(goal_msg, target, target_requested_at)
+            if object_name is None:
+                return None
         else: 
             object_name = ""
         goal_msg.object_name = object_name
+        if object_name:
+            self.get_logger().info(
+                f"Task Manager | Using simulation target object name: {object_name}"
+            )
 
         return goal_msg
+
+    async def _fill_goal_target(self, goal_msg, target, target_requested_at):
+        if not isinstance(target, dict) or not isinstance(target.get("object"), dict):
+            self.get_logger().error("Task Manager | Task target is missing or malformed")
+            return None
+
+        if self.target_source_mode != "simulation":
+            pose = await self._wait_for_perception_pose(target_requested_at)
+            if pose is not None:
+                goal_msg.x = pose[0]
+                goal_msg.y = pose[1]
+                goal_msg.z = pose[2]
+                self.get_logger().info(
+                    "Task Manager | Using perception target pose: "
+                    f"x={pose[0]:.3f}, y={pose[1]:.3f}, z={pose[2]:.3f}"
+                )
+                return ""
+
+            if self.target_source_mode == "perception":
+                self.get_logger().error(
+                    "Task Manager | No fresh perception target pose received; "
+                    "simulation fallback is disabled"
+                )
+                return None
+
+        fallback = "_".join(target["object"]["prompt"].split())
+        object_name = resolve_target_model_name(target, fallback=fallback)
+        self.get_logger().info(
+            "Task Manager | Using simulation fallback via scene_object_resolver: "
+            f"{object_name}"
+        )
+        return object_name
+
+    async def _wait_for_perception_pose(self, target_requested_at):
+        if self.target_source_mode == "auto" and self.count_publishers(self.target_pose_topic) == 0:
+            return None
+
+        if target_requested_at is None:
+            target_requested_at = time.monotonic()
+
+        deadline = time.monotonic() + self.perception_target_timeout
+        while time.monotonic() < deadline and rclpy.ok():
+            with self._target_pose_lock:
+                pose = self._latest_target_pose
+                received_at = self._latest_target_pose_received_at
+            if pose is not None and received_at >= target_requested_at:
+                return pose
+            await asyncio.sleep(0.05)
+
+        return None
     
     async def _async_ros_future(self, rclpy_future):
         loop = asyncio.get_running_loop()
@@ -218,6 +315,16 @@ class TaskManagerNode(Node):
             self.get_logger().error(f"Task Manager | Received invalid JSON string in command_callback: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Task Manager | Error in command_callback: {e}")
+
+    def _target_pose_callback(self, msg: PoseStamped) -> None:
+        position = msg.pose.position
+        with self._target_pose_lock:
+            self._latest_target_pose = (
+                float(position.x),
+                float(position.y),
+                float(position.z),
+            )
+            self._latest_target_pose_received_at = time.monotonic()
     
     def _update_state(self, success: bool) -> None:
         """Update robot's state."""

@@ -1,7 +1,8 @@
-import httpx
 import time
 import traceback
-from openai import AsyncOpenAI
+
+import httpx
+from openai import AsyncOpenAI, BadRequestError
 
 from decomposer.json_utils import is_valid_command_dict, parse_llm_json
 
@@ -89,7 +90,7 @@ class LLMClient:
                 temperature=temperature,
                 response_format={"type": "json_object"},
             )
-        except Exception as exc:
+        except BadRequestError as exc:
             if self.logger:
                 self.logger.warning(
                     f"LLM Client | JSON response_format unsupported, retrying without it: {exc}"

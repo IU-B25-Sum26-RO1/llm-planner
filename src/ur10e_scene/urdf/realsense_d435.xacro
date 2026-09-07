@@ -5,9 +5,9 @@
   <xacro:property name="cam_width" value="$(optenv TARGET_VIDEO_WIDTH 640)" />
   <xacro:property name="cam_height" value="$(optenv TARGET_VIDEO_HEIGHT 480)" />
 
-  <xacro:macro name="realsense_d435" params="parent *origin">
+  <xacro:macro name="realsense_d435" params="parent prefix:='camera' ros_namespace:='camera' camera_name:='camera' *origin">
     
-    <link name="camera_link">
+    <link name="${prefix}_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
@@ -29,21 +29,21 @@
       </inertial>
     </link>
 
-    <joint name="camera_joint" type="fixed">
+    <joint name="${prefix}_joint" type="fixed">
       <xacro:insert_block name="origin" />
       <parent link="${parent}"/>
-      <child link="camera_link"/>
+      <child link="${prefix}_link"/>
     </joint>
 
-    <link name="camera_color_optical_frame"/>
-    <joint name="camera_optical_joint" type="fixed">
+    <link name="${prefix}_color_optical_frame"/>
+    <joint name="${prefix}_optical_joint" type="fixed">
       <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
-      <parent link="camera_link"/>
-      <child link="camera_color_optical_frame"/>
+      <parent link="${prefix}_link"/>
+      <child link="${prefix}_color_optical_frame"/>
     </joint>
 
-    <gazebo reference="camera_link">
-      <sensor type="depth" name="camera">
+    <gazebo reference="${prefix}_link">
+      <sensor type="depth" name="${prefix}">
         <always_on>true</always_on>
         <update_rate>${cam_fps}</update_rate>
         <camera>
@@ -58,17 +58,17 @@
             <far>10.0</far>
           </clip>
         </camera>
-        <plugin name="camera_plugin" filename="libgazebo_ros_camera.so">
+        <plugin name="${prefix}_plugin" filename="libgazebo_ros_camera.so">
           <ros>
-            <namespace>camera</namespace>
+            <namespace>${ros_namespace}</namespace>
             <remapping>~/image_raw:=color/image_raw</remapping>
             <remapping>~/camera_info:=color/camera_info</remapping>
             <remapping>~/depth/image_raw:=depth/image_raw</remapping>
             <remapping>~/depth/camera_info:=depth/camera_info</remapping>
             <remapping>~/points:=depth/color/points</remapping>
           </ros>
-          <camera_name>camera</camera_name>
-          <frame_name>camera_color_optical_frame</frame_name>
+          <camera_name>${camera_name}</camera_name>
+          <frame_name>${prefix}_color_optical_frame</frame_name>
           <min_depth>0.1</min_depth>
           <max_depth>10.0</max_depth>
         </plugin>
