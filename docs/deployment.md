@@ -1,5 +1,7 @@
 # Установка и запуск
 
+[English version](deployment.en.md)
+
 Полная инструкция: [README.md](../README.md).
 
 Кратко:

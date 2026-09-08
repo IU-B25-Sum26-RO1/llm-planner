@@ -27,17 +27,18 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.9 /uv /uvx /bin/
 
 WORKDIR /workspace
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv pip compile pyproject.toml -o requirements.txt && \
-    uv pip sync requirements.txt --system 
+RUN uv export --locked --no-dev --no-emit-project -o requirements.txt && \
+    uv pip sync requirements.txt --system
 
 COPY ./src ./src
 COPY ./schemas ./schemas
+COPY ./evaluation ./evaluation
 
 RUN source /opt/ros/humble/setup.bash && colcon build --symlink-install
 

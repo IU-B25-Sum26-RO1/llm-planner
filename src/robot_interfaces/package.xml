@@ -3,9 +3,9 @@
 <package format="3">
   <name>robot_interfaces</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>ROS 2 action and service definitions for the UR10e planner.</description>
   <maintainer email="idfc1200@gmail.com">idfc1</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

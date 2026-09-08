@@ -67,10 +67,23 @@ def test_camera_and_preprocessor_use_the_same_default_topic(monkeypatch):
 
     assert driver.DEFAULT_CAMERA_RAW_TOPIC == '/camera/color/image_raw'
     assert preprocessor.DEFAULT_CAMERA_RAW_TOPIC == driver.DEFAULT_CAMERA_RAW_TOPIC
+    assert callable(driver.main)
 
     node = preprocessor.PreprocessorNode()
     assert isinstance(node.bridge, sys.modules['cv_bridge'].CvBridge)
     assert node.sub is not None
+
+
+def test_bridge_replaces_stale_frame_without_queue_overflow(monkeypatch):
+    _install_ros_stubs(monkeypatch)
+    bridge = importlib.import_module('sam3_bridge.sam3_bridge_node')
+    node = object.__new__(bridge.SAM3BridgeNode)
+    node.frame_queue = asyncio.Queue(maxsize=1)
+    node.frame_queue.put_nowait('old')
+
+    node._enqueue_latest_frame('new')
+
+    assert node.frame_queue.get_nowait() == 'new'
 
 
 def test_send_loop_sends_the_frame_that_completed_the_get(monkeypatch):

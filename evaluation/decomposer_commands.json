@@ -1,0 +1,129 @@
+[
+  {
+    "id": "pick_green_cube",
+    "utterance": "Возьми зелёный куб.",
+    "expected_type": "command",
+    "expected_actions": ["pick"],
+    "expected_fields": {
+      "tasks.0.target.object.class": "cube",
+      "tasks.0.target.object.attributes.color": "green",
+      "tasks.0.target.object.prompt": "green cube"
+    },
+    "tags": ["pick", "attribute"]
+  },
+  {
+    "id": "pick_leftmost_lid",
+    "utterance": "Возьми самую левую крышку.",
+    "expected_type": "command",
+    "expected_actions": ["pick"],
+    "expected_fields": {
+      "tasks.0.target.object.class": "lid",
+      "tasks.0.target.selection.type": "leftmost"
+    },
+    "tags": ["pick", "selection"]
+  },
+  {
+    "id": "pick_nearest_bottle_right_of_box",
+    "utterance": "Возьми ближайшую прозрачную бутылку справа от коробки.",
+    "expected_type": "command",
+    "expected_actions": ["pick"],
+    "expected_fields": {
+      "tasks.0.target.object.class": "bottle",
+      "tasks.0.target.object.prompt": "transparent bottle",
+      "tasks.0.target.search_space.0.relation": "right_of",
+      "tasks.0.target.search_space.0.reference.class": "box",
+      "tasks.0.target.selection.type": "nearest"
+    },
+    "tags": ["pick", "selection", "spatial"]
+  },
+  {
+    "id": "pick_and_place_on_tray",
+    "utterance": "Возьми зелёный куб и положи его на белый поднос.",
+    "expected_type": "command",
+    "expected_actions": ["pick", "place"],
+    "expected_fields": {
+      "tasks.0.target.object.class": "cube",
+      "tasks.1.placement.reference.object.class": "tray",
+      "tasks.1.placement.reference.object.attributes.color": "white",
+      "tasks.1.placement.relation": "on_top_of"
+    },
+    "tags": ["multi_step", "placement"]
+  },
+  {
+    "id": "put_ball_in_box",
+    "utterance": "Положи зелёный шарик со стола в коробку.",
+    "expected_type": "command",
+    "expected_actions": ["pick", "place"],
+    "expected_fields": {
+      "tasks.0.target.object.class": "ball",
+      "tasks.0.target.search_space.0.relation": "on_top_of",
+      "tasks.0.target.search_space.0.reference.class": "table",
+      "tasks.1.placement.reference.object.class": "box",
+      "tasks.1.placement.relation": "inside"
+    },
+    "tags": ["multi_step", "search_space", "placement"]
+  },
+  {
+    "id": "open_gripper",
+    "utterance": "Разожми захват.",
+    "expected_type": "command",
+    "expected_actions": ["open_gripper"],
+    "tags": ["gripper"]
+  },
+  {
+    "id": "close_gripper",
+    "utterance": "Зажми захват.",
+    "expected_type": "command",
+    "expected_actions": ["close_gripper"],
+    "tags": ["gripper"]
+  },
+  {
+    "id": "go_home",
+    "utterance": "Вернись домой.",
+    "expected_type": "command",
+    "expected_actions": ["go_home"],
+    "tags": ["home"]
+  },
+  {
+    "id": "home_then_pick",
+    "utterance": "Вернись домой, затем возьми зелёный куб.",
+    "expected_type": "command",
+    "expected_actions": ["go_home", "pick"],
+    "tags": ["multi_step", "home", "pick"]
+  },
+  {
+    "id": "emergency_stop",
+    "utterance": "Остановись.",
+    "expected_type": "command",
+    "expected_actions": ["stop"],
+    "tags": ["safety", "stop"]
+  },
+  {
+    "id": "release_object",
+    "utterance": "Отпусти предмет.",
+    "expected_type": "command",
+    "expected_actions": ["open_gripper"],
+    "tags": ["gripper", "reference"]
+  },
+  {
+    "id": "non_command_thanks",
+    "utterance": "Спасибо.",
+    "expected_type": "non_command",
+    "expected_actions": [],
+    "tags": ["non_command"]
+  },
+  {
+    "id": "non_command_observation",
+    "utterance": "Красный куб упал.",
+    "expected_type": "non_command",
+    "expected_actions": [],
+    "tags": ["non_command", "observation"]
+  },
+  {
+    "id": "unsupported_light",
+    "utterance": "Включи свет.",
+    "expected_type": "non_command",
+    "expected_actions": [],
+    "tags": ["unsupported"]
+  }
+]

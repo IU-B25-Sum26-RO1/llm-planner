@@ -124,7 +124,7 @@ def test_pick_reports_failure_when_virtual_attachment_fails(monkeypatch):
     interface.hover_height = 0.25
     interface.grasp_height = 0.135
     interface._detach = lambda: None
-    interface._get_object_position = lambda name: np.array([0.1, 0.2, 0.3])
+    interface._get_object_position = lambda name, **kwargs: np.array([0.1, 0.2, 0.3])
     interface._command_gripper = lambda **kwargs: None
     interface._move_tool_to = lambda *args, **kwargs: (True, "")
     interface._attach = lambda name: False
@@ -158,8 +158,60 @@ def test_action_server_rejects_invalid_goal_requests(monkeypatch):
             task_type="go_home", object_name="", x=float("nan"), y=0.0, z=0.0
         )
     )
+    invalid_modifiers = interface.goal_callback(
+        types.SimpleNamespace(
+            task_type="go_home",
+            object_name="",
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            speed="unbounded",
+            precision="",
+        )
+    )
 
     assert accepted == "accept"
     assert unknown == "reject"
     assert missing_object == "reject"
     assert non_finite == "reject"
+    assert invalid_modifiers == "reject"
+
+
+def test_cartesian_target_outside_workspace_is_rejected_before_ik(monkeypatch):
+    module = _robot_module(monkeypatch)
+    interface = object.__new__(module.UR10eInterface)
+    interface.workspace_min = module.DEFAULT_WORKSPACE_MIN
+    interface.workspace_max = module.DEFAULT_WORKSPACE_MAX
+
+    success, error = interface._move_tool_to([100.0, 0.0, 1.0])
+
+    assert not success
+    assert "outside configured workspace" in error
+
+
+def test_place_requires_a_held_object(monkeypatch):
+    module = _robot_module(monkeypatch)
+    interface = object.__new__(module.UR10eInterface)
+    interface._held = None
+
+    success, error = interface._place("white_tray", None)
+
+    assert not success
+    assert "not holding" in error
+
+
+def test_execution_modifiers_are_bounded_and_affect_motion_checks(monkeypatch):
+    module = _robot_module(monkeypatch)
+    interface = object.__new__(module.UR10eInterface)
+    interface.move_speed = 0.8
+    interface.max_move_speed = 1.0
+    interface.joint_goal_tolerance = 0.05
+    interface._active_speed = "fast"
+    interface._active_precision = "high"
+
+    assert interface._effective_move_speed() == pytest.approx(0.9)
+    assert interface._effective_joint_tolerance() == pytest.approx(0.025)
+
+    interface._active_precision = "low"
+    assert interface._effective_move_speed() == pytest.approx(1.0)
+    assert interface._effective_joint_tolerance() == pytest.approx(0.1)

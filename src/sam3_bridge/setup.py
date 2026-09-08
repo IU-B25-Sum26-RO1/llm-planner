@@ -15,8 +15,8 @@ setup(
     zip_safe=True,
     maintainer='idfc1',
     maintainer_email='idfc1200@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='ROS 2 WebSocket bridge for SAM3 target segmentation',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

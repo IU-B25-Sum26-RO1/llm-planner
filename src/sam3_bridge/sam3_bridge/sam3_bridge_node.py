@@ -1,7 +1,6 @@
 import asyncio
 import os
 import base64
-import time
 import threading
 import json
 
@@ -13,6 +12,9 @@ from std_msgs.msg import String                    # type: ignore
 from sensor_msgs.msg import CompressedImage, Image # type: ignore
 import cv2
 from cv_bridge import CvBridge                     # type: ignore
+
+
+DEFAULT_SAM3_SERVER_URL = 'ws://host.docker.internal:8120/websocket'
 
 
 class SAM3BridgeNode(Node):
@@ -27,7 +29,7 @@ class SAM3BridgeNode(Node):
         self.declare_parameter('target_sub_topic', self.target_sub_topic)
         self.declare_parameter('raw_mask_pub_topic', self.raw_mask_pub_topic)
 
-        env_server_url = os.environ.get('SAM3_SERVER_URL')
+        env_server_url = os.environ.get('SAM3_SERVER_URL', DEFAULT_SAM3_SERVER_URL)
         self.declare_parameter('server_url', env_server_url)
         self.server_url = self.get_parameter('server_url').value
 
@@ -80,13 +82,18 @@ class SAM3BridgeNode(Node):
         if self.loop is None:
             return 
         
+        self.loop.call_soon_threadsafe(self._enqueue_latest_frame, msg)
+
+    def _enqueue_latest_frame(self, msg: CompressedImage) -> None:
+        """Replace a stale queued frame without racing cross-thread callbacks."""
+        if self.frame_queue is None:
+            return
         if self.frame_queue.full():
             try:
-                self.loop.call_soon_threadsafe(self.frame_queue.get_nowait)
+                self.frame_queue.get_nowait()
             except asyncio.QueueEmpty:
                 pass
-        
-        self.loop.call_soon_threadsafe(self.frame_queue.put_nowait, msg)
+        self.frame_queue.put_nowait(msg)
     
     def target_callback(self, msg: String):
         if self.target_queue is None:
@@ -106,7 +113,7 @@ class SAM3BridgeNode(Node):
             }
 
             self.loop.call_soon_threadsafe(self.target_queue.put_nowait, payload)
-            self.get_logger().info(f"[TARGET] New target queued from ROS topic.")
+            self.get_logger().info("[TARGET] New target queued from ROS topic.")
 
         except json.JSONDecodeError:
             self.get_logger().error(f"Received invalid JSON string in target_callback: {msg.data}")
@@ -179,10 +186,10 @@ class SAM3BridgeNode(Node):
                     if target_task in done:
                         target_msg = target_task.result()
 
-                        self.get_logger().info(f'[SEND] Sending target to server...')
+                        self.get_logger().info('[SEND] Sending target to server...')
                         if not ws.closed:
                             await ws.send_str(json.dumps(target_msg))
-                            self.get_logger().info(f'[SEND] Target sent.')
+                            self.get_logger().info('[SEND] Target sent.')
 
                         target_task = asyncio.create_task(self.target_queue.get())
 
@@ -227,8 +234,17 @@ class SAM3BridgeNode(Node):
                     if isinstance(data, dict) and data.get("status") == "error":
                         self.get_logger().error(f"Server returned error: {data.get('error')}")
                         continue
+
+                    if not isinstance(data, list):
+                        self.get_logger().error(
+                            'SAM3 server response must be a list of result objects'
+                        )
+                        continue
                     
                     for item in data:
+                        if not isinstance(item, dict):
+                            self.get_logger().error('Ignoring malformed SAM3 result item')
+                            continue
                         if item.get("status") == "success":
                             obj_id = item.get("obj_id")
                             b64_mask = item.get("mask")
