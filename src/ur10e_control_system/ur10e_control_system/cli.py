@@ -56,12 +56,12 @@ class CommandSender(Node):
     def _feedback_cb(self, feedback_msg):
         self.get_logger().info(f"Feedback: {feedback_msg.feedback.current_state}")
 
-
 def _parse_and_run(node: CommandSender, argv):
     command = argv[0]
 
     if command in ("grasp", "release"):
-        return node.send_action(command)
+        action = "close_gripper" if command == "grasp" else "open_gripper"
+        return node.send_action(action)
 
     if command == "home":
         return node.send_action("go_home")

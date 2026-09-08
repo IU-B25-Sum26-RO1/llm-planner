@@ -1,7 +1,7 @@
 [project]
 name = "llm-planner"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice-controlled UR10e manipulation with an LLM task planner"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
@@ -9,7 +9,7 @@ dependencies = [
     "clip @ git+https://github.com/ultralytics/CLIP.git",
     "dotenv>=0.9.9",
     "fastapi>=0.138.0",
-    "httpx>=0.28.1",
+    "httpx>=0.28.1,<1",
     "numpy<2.0.0",
     "openai>=2.44.0",
     "opencv-python-headless<4.11.0",
@@ -20,7 +20,7 @@ dependencies = [
     "torchvision>=0.16.0",
     "ultralytics>=8.3.0",
     "uvicorn>=0.49.0",
-    "vosk>=0.3.45",
+    "vosk>=0.3.45; sys_platform == 'linux'",
 ]
 
 [tool.uv.sources]
@@ -37,3 +37,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.15.18",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

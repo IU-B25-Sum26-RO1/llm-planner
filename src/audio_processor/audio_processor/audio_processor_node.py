@@ -9,11 +9,20 @@ from std_msgs.msg import String
 from audio_processor.recorder import Recorder
 from audio_processor.recognizer import Recognizer
 
+DEFAULT_VOSK_MODEL = 'vosk-model-small-ru-0.22'
+DEFAULT_MODELS_DIR = '/workspace/models'
+
+
+def resolve_model_path(model: str, models_dir: str = DEFAULT_MODELS_DIR) -> str:
+    """Resolve a model directory name while preserving explicit absolute paths."""
+    return model if os.path.isabs(model) else os.path.join(models_dir, model)
+
+
 class AudioProcessorNode(Node):
     def __init__(self):
         super().__init__('audio_processor_node')
 
-        env_vosk_model = os.environ.get('VOSK_MODEL', 'workspace/models/vosk-model-small-ru-0.22')
+        env_vosk_model = os.environ.get('VOSK_MODEL', DEFAULT_VOSK_MODEL)
         env_samplerate = int(os.environ.get('AUDIO_SAMPLERATE', 16000))
         env_block_size = int(os.environ.get('AUDIO_BLOCK_SIZE', 4000))
 
@@ -21,9 +30,11 @@ class AudioProcessorNode(Node):
         self.declare_parameter('samplerate', env_samplerate)
         self.declare_parameter('block_size', env_block_size)
 
-        model_path = "/workspace/models/" + self.get_parameter('vosk_model').value
-        samplerate = self.get_parameter('samplerate').value
-        blocksize = self.get_parameter('block_size').value
+        model_path = resolve_model_path(self.get_parameter('vosk_model').value)
+        samplerate = int(self.get_parameter('samplerate').value)
+        blocksize = int(self.get_parameter('block_size').value)
+        if samplerate <= 0 or blocksize <= 0:
+            raise ValueError('samplerate and block_size must be positive')
         
         self.text_publisher = self.create_publisher(String, '/recognized_text', 10)
 
@@ -42,7 +53,10 @@ class AudioProcessorNode(Node):
     
     def run_async_loop(self):
         asyncio.set_event_loop(self.async_loop)
-        self.async_loop.run_until_complete(self._start_audio_processing())
+        try:
+            self.async_loop.run_until_complete(self._start_audio_processing())
+        finally:
+            self.async_loop.close()
     
     async def _start_audio_processing(self):
         self.get_logger().info("Starting audio processing loop...")
@@ -50,6 +64,8 @@ class AudioProcessorNode(Node):
         while rclpy.ok() and self.is_running:
             try:
                 chunk = await self.recorder.get_chunk()
+                if chunk is None:
+                    break
                 result = self.recognizer.recognize_chunk(chunk)
                 
                 if result.get("text", ""):
@@ -84,7 +100,10 @@ class AudioProcessorNode(Node):
             self.get_logger().error(f"Error during shutdown: {e}")
         
         if self.async_loop.is_running():
-            self.async_loop.call_soon_threadsafe(self.async_loop.stop)
+            self.async_loop.call_soon_threadsafe(
+                self.recorder._enqueue_latest, None
+            )
+            self.worker_thread.join(timeout=2.0)
         super().destroy_node()
 
 

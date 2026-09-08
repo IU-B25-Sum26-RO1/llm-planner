@@ -55,14 +55,14 @@ TASK SCHEMA:
 -------------------------------------------------
 TARGET SCHEMA:
 {
-    "object": object
+    "object": object,
 
     "search_space": [
         {
             "relation": string,
             "reference": object
         }
-    ]
+    ],
 
     "selection": {
         "type": string 
@@ -122,7 +122,7 @@ Examples:
 
 "Открой захват."
 
-"Подойди ближе."
+"Вернись домой."
 
 "Стоп."
 
@@ -203,12 +203,12 @@ Use only one of these canonical actions:
 
 pick ("Возьми", "Подбери", "Захвати")
 place ("Положи")
-move_to ("Передвинься")
 open_gripper ("Отпусти [object_name]", "Разожми захват", "Отпусти")
 close_gripper ("Зажми захват", "Зажми гриппер")
 go_home ("Домой", "Вернись домой")
 stop ("Стоп", "Стой", "Остановись", "Отмена")
-unknown
+
+If a request needs an action outside this list, return type = "non_command" and no tasks.
 
 Parentheses indicate which words most often imply this action.
 
@@ -324,9 +324,8 @@ Examples:
 стол -> table
 кнопка -> button
 
-If no object in command:
-
-"class": null
+For actions that do not refer to an object, set the task's "target" field to null.
+Never create an object with a null "class".
 
 
 Examples:
@@ -859,12 +858,8 @@ Action cannot be reliably determined.
 UNKNOWN
 ==================================================
 
-If Action cannot be determined:
-
-{
-    "action": "unknown",
-    ...
-}
+If the requested action cannot be determined or is unsupported, return a
+non_command response with an empty tasks list.
 
 ==================================================
 EXAMPLES
@@ -908,7 +903,7 @@ Output:
         },
         {
             "action": "place",
-            "target": null
+            "target": null,
             "placement": {
                 "reference": {
                     "object": {
@@ -1007,7 +1002,7 @@ Output:
         },
         {
             "action": "place",
-            "target": null
+            "target": null,
             "placement": {
                 "reference": {
                     "object": {
@@ -1092,7 +1087,7 @@ Output:
 
 Input:
 
-"Стой" / "Стой" / "Остановись"
+Остановись
 
 Output:
 
@@ -1111,6 +1106,6 @@ Output:
             "confidence": 0.98
         }
     ],
-    "text": "Стой" / "Стой" / "Остановись",
+    "text": "Остановись",
     "confidence": 0.97
 }

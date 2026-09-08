@@ -7,16 +7,20 @@ from sensor_msgs.msg import CompressedImage, Image
 import cv2
 from cv_bridge import CvBridge
 
+
+DEFAULT_CAMERA_RAW_TOPIC = '/camera/color/image_raw'
+
+
 class PreprocessorNode(Node):
     def __init__(self):
         super().__init__('preprocessor_node')
         
-        env_sub_topic = os.environ.get('CAMERA_RAW_TOPIC')
+        env_sub_topic = os.environ.get('CAMERA_RAW_TOPIC', DEFAULT_CAMERA_RAW_TOPIC)
         env_target_fps = int(os.environ.get('TARGET_VIDEO_FPS', 10))
         env_target_width = int(os.environ.get('TARGET_VIDEO_WIDTH', 640))
         env_target_height = int(os.environ.get('TARGET_VIDEO_HEIGHT', 480))
 
-        pub_topic = 'camera/color/image_raw/processed'
+        pub_topic = '/camera/color/image_raw/processed'
         
         self.declare_parameter('sub_topic', env_sub_topic)
         self.declare_parameter('target_fps', env_target_fps)
@@ -32,6 +36,7 @@ class PreprocessorNode(Node):
             raise ValueError('target_fps, target_width, and target_height must be positive')
         self.frame_interval = 1.0 / self.target_fps
         self.last_publish_time = 0.0
+        self.bridge = CvBridge()
 
         self.sub = self.create_subscription(Image, sub_topic, self.callback, 10)
         self.pub = self.create_publisher(CompressedImage, pub_topic, 10)

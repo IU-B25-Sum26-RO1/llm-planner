@@ -1,5 +1,7 @@
 # LLM Planner
 
+[English documentation](README.en.md)
+
 Голосовое и текстовое управление роботом UR10e: LLM разбивает команду оператора на примитивы, которые исполняются в симуляции Gazebo (ROS 2 Humble).
 
 Пайплайн: микрофон → Vosk → LLM-декомпозиция → Task Manager → UR10e Interface / Gazebo. Опционально: кадры камеры → SAM3.
@@ -52,6 +54,49 @@ cp .env.example .env
 | `SAM3_SERVER_URL` | WebSocket URL сервера SAM3 |
 | `TARGET_VIDEO_FPS` / `TARGET_VIDEO_WIDTH` / `TARGET_VIDEO_HEIGHT` | Параметры видео для preprocessor |
 
+### Проверка цепочки camera → preprocessor → SAM3
+
+Стандартный входной топик — `/camera/color/image_raw`: он совпадает со
+значением `CAMERA_RAW_TOPIC` в `.env.example` и с топиком, публикуемым
+`camera_driver`. Соберите затронутые пакеты:
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --packages-select camera_driver sam3_preprocessor sam3_bridge
+source install/setup.bash
+```
+
+В трёх терминалах (каждый после `source /opt/ros/humble/setup.bash && source
+install/setup.bash`) запустите publisher, preprocessor и bridge:
+
+```bash
+ros2 run camera_driver camera_publisher
+```
+
+```bash
+CAMERA_RAW_TOPIC=/camera/color/image_raw ros2 run sam3_preprocessor preprocessor
+```
+
+```bash
+SAM3_SERVER_URL=ws://localhost:8120/websocket ros2 run sam3_bridge bridge
+```
+
+В четвёртом терминале проверьте типы и поток сообщений:
+
+```bash
+ros2 topic info -v /camera/color/image_raw
+ros2 topic info -v /camera/color/image_raw/processed
+ros2 topic echo --once /camera/color/image_raw/processed sensor_msgs/msg/CompressedImage
+```
+
+Для simulator не запускайте первый процесс: оставьте `ur10e_scene` publisher
+на `/camera/color/image_raw`. При доступном SAM3-сервере дополнительно
+проверьте выход маски:
+
+```bash
+ros2 topic echo --once /sam3/output/mask_raw sensor_msgs/msg/Image
+```
+
 ### Модель Vosk
 
 ```bash
@@ -97,8 +142,8 @@ docker compose up
 |---|---|
 | `audio_processor` | Захват микрофона, распознавание речи (Vosk) |
 | `decomposer` | Декомпозиция текста командой через LLM |
-| `simulation` | Gazebo + сцена UR10e + `ur10e_interface` |
-| `ur10e_control` | Task Manager (очередь задач на робота) |
+| `simulation` | Gazebo + сцена UR10e |
+| `ur10e_control` | Task Manager и `ur10e_interface` |
 | `sam3_preprocessor` | Прокидывание/подготовка кадров камеры |
 | `sam3_bridge` | Клиент к внешнему SAM3 |
 
@@ -107,6 +152,33 @@ docker compose up
 ```bash
 docker compose down
 ```
+
+Проверка связки Task Manager → BaseAction после запуска:
+
+```bash
+docker compose exec ur10e_control \
+  bash /workspace/src/ur10e_control_system/scripts/verify_base_action.sh
+```
+
+Команда завершается с кодом 0 только когда `/execute/base_action` имеет тип
+`robot_interfaces/action/BaseAction` и в ROS-графе видны как минимум один сервер
+и один клиент (Task Manager). Эта же проверка используется как healthcheck сервиса
+`ur10e_control`.
+
+### Smoke-тест `ur10e_control`
+
+После сборки ROS Humble-образа из корня репозитория запустите:
+
+```bash
+docker compose build && bash tests/docker-compose-control-smoke-test.sh
+```
+
+Тест запускает настоящий Compose-сервис `ur10e_control` без его внешних зависимостей,
+проверяет одновременное присутствие `task_manager_node` и `ur10e_interface`, тип и
+клиент/серверные endpoints `/execute/base_action`, затем останавливает сервис. Успех
+возможен только при чистом завершении контейнера с кодом 0. Не запускайте его, пока
+ваш рабочий `ur10e_control` уже работает: скрипт специально завершится с ошибкой,
+чтобы не прерывать текущую сессию.
 
 Перезапуск одного сервиса:
 
@@ -130,16 +202,16 @@ docker compose up simulation
 ```bash
 docker compose exec simulation bash -c \
   "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && \
-   ros2 run ur10e_control_system cli pick green_cube"
+   ros2 run ur10e_control_system cli pick pyramid_cube_1"
 ```
 
 Примеры CLI:
 
 ```text
 cli home
-cli pick green_cube
-cli place white_tray
-cli move_to_object green_cube
+cli pick pyramid_cube_1
+cli place table
+cli move_to_object pyramid_cube_1
 cli move_to 0.3 0.2 1.05
 cli forward 0.1
 ```
@@ -166,9 +238,11 @@ docker run -it --rm --network host --privileged \
 .
 ├── docker-compose.yml      # сервисы системы
 ├── Dockerfile              # ROS 2 Humble + зависимости + colcon build
+├── evaluation/             # versioned corpus for LLM evaluation
 ├── prompts/                # system prompt для LLM
 ├── schemas/                # pydantic-схемы команд
-├── scripts/                # вспомогательные скрипты (тест декомпозиции)
+├── scripts/                # standalone evaluation tools
+├── tests/                  # unit/regression и Compose smoke-тесты
 └── src/
     ├── audio_processor/    # микрофон + Vosk
     ├── decomposer/         # LLM-планировщик
@@ -182,19 +256,59 @@ docker run -it --rm --network host --privileged \
 
 ## Локальная разработка Python-зависимостей (без ROS)
 
-Для скриптов вне Docker (например `scripts/test_llm_decompose.py`):
+Для unit/regression-тестов вне Docker:
 
 ```bash
 # нужен uv: https://docs.astral.sh/uv/
 uv sync
 source .venv/bin/activate
-export LLM_API_URL=http://localhost:8000/v1
-export LLM_MODEL=Qwen/Qwen2.5-3B-Instruct
-export SYS_PROMPT_PATH=./prompts/decomposer_system_prompt.txt
-python scripts/test_llm_decompose.py
+python -m pytest
 ```
 
-Полный ROS-стек запускается через Docker, как описано выше.
+`.python-version` фиксирует Python 3.10, соответствующий ROS 2 Humble. Пакет
+`vosk` устанавливается только на Linux: версия 0.3.45 не публикует дистрибутив
+для macOS/Apple Silicon. На macOS можно запускать исходные unit/regression-тесты,
+но полный голосовой и ROS-стек запускается в целевой Linux/WSL2/Docker-среде,
+как описано выше.
+
+## Оценка качества LLM-декомпозиции
+
+В [evaluation/decomposer_commands.json](evaluation/decomposer_commands.json)
+содержится 14 версионированных русскоязычных случаев: все шесть действий,
+многошаговые команды, пространственные ограничения, выбор объекта,
+неподдерживаемые запросы и `non_command`.
+
+После настройки LLM выполните несколько прогонов каждого случая:
+
+```bash
+set -a
+source .env
+set +a
+python scripts/evaluate_decomposer.py --trials 3
+```
+
+Скрипт проверяет Pydantic-схему, тип команды, порядок действий, язык,
+сохранение исходного текста и обязательные семантические поля. Подробный JSON
+записывается в `artifacts/evaluations/decomposer-evaluation.json`; код возврата
+равен нулю только при 100% точном прохождении. Это проверка планировщика, а не
+доказательство успешного исполнения роботом.
+
+### Повторяемый ввод без микрофона
+
+Для smoke-теста границы `recognized_text → decomposer` используйте
+версионированный транскрипт `evaluation/recognized_text_smoke.txt`. После запуска
+`decomposer` выполните в отдельном терминале:
+
+```bash
+docker compose exec decomposer bash -c \
+  "source /opt/ros/humble/setup.bash && source /workspace/install/setup.bash && \
+   ros2 run audio_processor text_replay --ros-args \
+   -p transcript_path:=/workspace/evaluation/recognized_text_smoke.txt"
+```
+
+Узел ждёт подписчика `/recognized_text`, отправляет команды по порядку и
+останавливает таймер после последней строки. Это делает вход планировщика
+повторяемым, но отдельно не проверяет качество Vosk и физическое выполнение.
 
 ## Полезные команды
 

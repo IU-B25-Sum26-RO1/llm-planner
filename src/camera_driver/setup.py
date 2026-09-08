@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='Aioma',
     maintainer_email='idfc1200@gmail.com',
-    description='TODO: Description',
+    description='ROS 2 publisher for a physical camera image stream',
     license='Apache-2.0',
     extras_require={
         'test': [

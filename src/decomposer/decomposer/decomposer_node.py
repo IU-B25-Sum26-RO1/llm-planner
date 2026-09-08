@@ -169,7 +169,16 @@ class DecomposerNode(Node):
 
     
     def destroy_node(self):
-        self.async_loop.call_soon_threadsafe(self.async_loop.stop)
+        if self.async_loop.is_running():
+            close_future = asyncio.run_coroutine_threadsafe(
+                self.llm_client.close(), self.async_loop
+            )
+            try:
+                close_future.result(timeout=5.0)
+            except Exception as exc:
+                self.get_logger().warning(f"Failed to close LLM client cleanly: {exc}")
+            self.async_loop.call_soon_threadsafe(self.async_loop.stop)
+            self.worker_thread.join(timeout=5.0)
         super().destroy_node()
     
     def publish_cmd(self, cmd_obj: dict):
