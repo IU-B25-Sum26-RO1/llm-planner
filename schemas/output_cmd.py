@@ -89,8 +89,8 @@ class TargetSchema(BaseModel):
 class TaskModifiers(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    speed: Optional[Literal["slow", "normal", "fast"]] = None
-    precision: Optional[Literal["low", "normal", "high"]] = None
+    speed: Optional[str] = None
+    precision: Optional[str] = None
 
 
 class PlacementSchema(BaseModel):

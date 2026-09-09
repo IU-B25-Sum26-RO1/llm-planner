@@ -1,7 +1,7 @@
 import asyncio
-import itertools
 import json
 import threading
+import time
 
 import rclpy                                       # type: ignore
 from rclpy.node import Node                        # type: ignore
@@ -10,21 +10,8 @@ from rclpy.executors import MultiThreadedExecutor  # type: ignore
 from std_msgs.msg import String                    # type: ignore
 
 from robot_interfaces.action import BaseAction     # type: ignore
+from robot_interfaces.srv import GripperControl    # type: ignore
 from schemas.command_contract import LLM_ACTIONS
-from schemas.output_cmd import OutputCommandSchema
-
-
-def _without_runtime_ids(value):
-    """Remove IDs added after LLM validation so the strict schema can be reapplied."""
-    if isinstance(value, dict):
-        return {
-            key: _without_runtime_ids(item)
-            for key, item in value.items()
-            if key not in {"id", "key"}
-        }
-    if isinstance(value, list):
-        return [_without_runtime_ids(item) for item in value]
-    return value
 
 class TaskManagerNode(Node):
     def __init__(self):
@@ -34,6 +21,8 @@ class TaskManagerNode(Node):
         target_tracker_topic = '/to_track/target'
 
         base_action_topic = '/execute/base_action'
+        gripper_control_topic = '/execute/gripper_control'
+
         self.cmd_sub = self.create_subscription(
             String,
             json_command_topic,
@@ -53,6 +42,11 @@ class TaskManagerNode(Node):
             self, BaseAction, base_action_topic 
         )
 
+        self.gripper_client = self.create_client(
+            GripperControl,
+            gripper_control_topic
+        )
+
         self.state = {
             "held": None,
             "in_fault": False
@@ -61,8 +55,6 @@ class TaskManagerNode(Node):
         self.executing_task = None
         self.current_target = None
         self.active_goal_handle = None
-        self.stop_generation = 0
-        self.queue_sequence = itertools.count()
 
         self.loop = None
         self.loop_tread = threading.Thread(target=self._run_async_loop, daemon=True)
@@ -77,7 +69,7 @@ class TaskManagerNode(Node):
             self.get_logger().critical(f"Task Manager | Async loop has crashed with {str(e)}")
         finally:
             self.loop.close()
-            self.get_logger().info("Async loop closed.")
+            self.get_logger().info(f"Async loop closed.")
     
     async def orchestrator(self):
         self.task_queue = asyncio.PriorityQueue(maxsize=10)
@@ -86,11 +78,15 @@ class TaskManagerNode(Node):
         await asyncio.to_thread(self.action_client.wait_for_server)
         self.get_logger().info("Task Manager | Action Server is ready!")
 
+        self.get_logger().info("Task Manager | Waiting for Gripper Service...")
+        await asyncio.to_thread(self.gripper_client.wait_for_service)
+        self.get_logger().info("Task Manager | Gripper Service is ready!")
+
         while rclpy.ok():
             try:
                 items = await self.task_queue.get()
-                task_generation = items[2]
-                task = items[3]
+                task = items[2]
+                action = task["action"]
                 success = False
 
                 self.executing_task = task
@@ -100,7 +96,12 @@ class TaskManagerNode(Node):
                 target_msg.data = json.dumps(self.current_target)
                 self.current_target_pub.publish(target_msg)
                 
-                success = await self.send_task_to_robot(task, task_generation)
+                if action == "open_gripper":
+                    success = await self.send_gripper_command(activate=False)
+                elif action == "close_gripper":
+                    success = await self.send_gripper_command(activate=True)
+                else:
+                    success = await self.send_task_to_robot(task)
             
                 if success:
                     self.get_logger().info("Task Manager | Task successfully completed")
@@ -116,14 +117,24 @@ class TaskManagerNode(Node):
             except Exception as e:
                 self.get_logger().error(f"Task Manager | Error in orchestrator loop: {e}")
     
-    async def send_task_to_robot(self, task, task_generation):
+    async def send_gripper_command(self, activate: bool) -> bool:
         try:
-            if task_generation != self.stop_generation:
-                self.get_logger().warning(
-                    "Task Manager | Discarding task invalidated by a stop request"
-                )
-                return False
+            self.get_logger().info(f"Task Manager | Received gripper command: {'close' if activate else 'open'}")
+            request = GripperControl.Request()
+            request.activate = activate
 
+            srv_future = self.gripper_client.call_async(request)
+
+            response = await self._async_ros_future(srv_future)
+
+            return response.success
+        
+        except Exception as e:
+            self.get_logger().error(f"Task Manager | Error while sending gripper command: {str(e)}")
+            return False
+
+    async def send_task_to_robot(self, task):
+        try:
             self.get_logger().info(f"Task Manager | Received task: {task['id']} ({task['action']})")
             goal_msg = self.create_goal_msg(task)
 
@@ -137,14 +148,6 @@ class TaskManagerNode(Node):
 
             self.active_goal_handle = goal_handle
             try:
-                if task_generation != self.stop_generation:
-                    cancel_future = goal_handle.cancel_goal_async()
-                    await self._async_ros_future(cancel_future)
-                    self.get_logger().warning(
-                        "Task Manager | Canceled goal accepted during a stop request"
-                    )
-                    return False
-
                 self.get_logger().info("Task Manager | Robot accepted the task. Waiting for result...")
                 get_result_future = goal_handle.get_result_async()
                 result_response = await self._async_ros_future(get_result_future)
@@ -170,9 +173,6 @@ class TaskManagerNode(Node):
 
         goal_msg.task_type = task["action"]
         task_type = task["action"]
-        modifiers = task.get("modifiers") or {}
-        goal_msg.speed = modifiers.get("speed") or ""
-        goal_msg.precision = modifiers.get("precision") or ""
 
         if task_type == "place":
             object_name = "_".join(task["placement"]["reference"]["object"]["prompt"].split())
@@ -206,54 +206,37 @@ class TaskManagerNode(Node):
 
         try:
             cmd_obj = json.loads(msg.data)
-            OutputCommandSchema.model_validate(_without_runtime_ids(cmd_obj))
-            if cmd_obj['type'] == 'non_command':
+            if cmd_obj['type'] == 'non_command' or cmd_obj['confidence'] < 0.5: 
                 return
+            
+            self.get_logger().info(f"Manager received new command: {cmd_obj['text']}")
 
             tasks = cmd_obj["tasks"]
             if any(task.get("action") == "stop" for task in tasks):
-                # Invalidate both queued work and a goal that may currently be
-                # awaiting action-server acceptance. A stop is never filtered
-                # by the normal command-confidence threshold.
-                self.stop_generation += 1
                 self.loop.call_soon_threadsafe(self._schedule_stop)
                 return
 
-            if cmd_obj['confidence'] < 0.5:
-                return
-
-            self.get_logger().info(f"Manager received new command: {cmd_obj['text']}")
-
-            payloads = []
             for task in tasks:
                 action = task.get("action")
                 if action not in LLM_ACTIONS:
                     self.get_logger().error(
                         f"Task Manager | Refusing unsupported action: {action!r}"
                     )
-                    return
-                payloads.append(
-                    (1, next(self.queue_sequence), self.stop_generation, task)
-                )
-            self.loop.call_soon_threadsafe(self._enqueue_tasks, payloads)
+                    continue
+                timestamp = time.time()
+                payload = (1, timestamp, task)
+                self.loop.call_soon_threadsafe(self._enqueue_task, payload)
         
         except json.JSONDecodeError:
             self.get_logger().error(f"Task Manager | Received invalid JSON string in command_callback: {msg.data}")
         except Exception as e:
             self.get_logger().error(f"Task Manager | Error in command_callback: {e}")
 
-    def _enqueue_tasks(self, payloads) -> None:
-        """Enqueue a plan atomically so capacity errors cannot execute half of it."""
-        available = self.task_queue.maxsize - self.task_queue.qsize()
-        if self.task_queue.maxsize > 0 and len(payloads) > available:
-            self.get_logger().error(
-                "Task Manager | Queue lacks capacity for the complete command; "
-                "all tasks were rejected"
-            )
-            return
-
-        for payload in payloads:
+    def _enqueue_task(self, payload) -> None:
+        try:
             self.task_queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            self.get_logger().error("Task Manager | Queue full; command was rejected")
 
     def _schedule_stop(self) -> None:
         asyncio.create_task(self._stop_active_task())
@@ -281,16 +264,11 @@ class TaskManagerNode(Node):
         if not success:
             self.state["in_fault"] = True
         else:
-            self.state["in_fault"] = False
             if self.executing_task is None:
-                self.get_logger().warning(
-                    "Executing command is None. Cannot update state"
-                )
+                self.get_logger().warn(f"Executing command is None. Cannot update state")
                 return 
             if self.executing_task["action"] == "pick":
                 self.state["held"] = self.executing_task["target"]["object"]
-            elif self.executing_task["action"] in ("place", "open_gripper"):
-                self.state["held"] = None
             
         
     def _select_target(self, task: dict) -> None:
@@ -309,7 +287,7 @@ class TaskManagerNode(Node):
                 f"Task Manager | Selected target: {target_key} ({target_prompt})"
             )
         else: 
-            self.get_logger().info("Task Manager | Selected target: null")
+            self.get_logger().info(f"Task Manager | Selected target: null")
 
 
 

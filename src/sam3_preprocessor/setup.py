@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='Aioma',
     maintainer_email='idfc1200@gmail.com',
-    description='Camera frame resizing and JPEG encoding for SAM3',
+    description='TODO: Package description',
     license='Apache-2.0',
     extras_require={
         'test': [

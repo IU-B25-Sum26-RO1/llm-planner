@@ -56,6 +56,12 @@ def generate_launch_description():
         arguments=["gripper_controller"],
     )
 
+    robot_interface = Node(
+        package="ur10e_control_system",
+        executable="ur10e_interface",
+        output="screen",
+    )
+
     return LaunchDescription([
         gazebo,
         robot_state_publisher,
@@ -63,4 +69,5 @@ def generate_launch_description():
         load_joint_state_broadcaster,
         load_joint_trajectory_controller,
         load_gripper_controller,
+        robot_interface,
     ])
