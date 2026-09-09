@@ -55,14 +55,14 @@ TASK SCHEMA:
 -------------------------------------------------
 TARGET SCHEMA:
 {
-    "object": object,
+    "object": object
 
     "search_space": [
         {
             "relation": string,
             "reference": object
         }
-    ],
+    ]
 
     "selection": {
         "type": string 
@@ -122,7 +122,7 @@ Examples:
 
 "Открой захват."
 
-"Вернись домой."
+"Подойди ближе."
 
 "Стоп."
 
@@ -324,8 +324,9 @@ Examples:
 стол -> table
 кнопка -> button
 
-For actions that do not refer to an object, set the task's "target" field to null.
-Never create an object with a null "class".
+If no object in command:
+
+"class": null
 
 
 Examples:
@@ -903,7 +904,7 @@ Output:
         },
         {
             "action": "place",
-            "target": null,
+            "target": null
             "placement": {
                 "reference": {
                     "object": {
@@ -1002,7 +1003,7 @@ Output:
         },
         {
             "action": "place",
-            "target": null,
+            "target": null
             "placement": {
                 "reference": {
                     "object": {
@@ -1087,7 +1088,7 @@ Output:
 
 Input:
 
-Остановись
+"Стой" / "Стой" / "Остановись"
 
 Output:
 
@@ -1106,6 +1107,6 @@ Output:
             "confidence": 0.98
         }
     ],
-    "text": "Остановись",
+    "text": "Стой" / "Стой" / "Остановись",
     "confidence": 0.97
 }

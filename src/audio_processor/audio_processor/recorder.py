@@ -13,7 +13,7 @@ class Recorder:
         self.recording = False
         self.logger = logger
 
-        self.audio_queue = asyncio.Queue(maxsize=8)
+        self.audio_queue = asyncio.Queue()
         self.stream = sd.RawInputStream(
             samplerate=self.samplerate,
             blocksize=self.blocksize,
@@ -26,29 +26,20 @@ class Recorder:
     def _callback(self, indata, frames, time, status):
         if status:
             self.logger.error(f"[RECORDER]: {status}")
-        self.loop.call_soon_threadsafe(self._enqueue_latest, bytes(indata))
-
-    def _enqueue_latest(self, chunk):
-        """Bound latency by dropping the oldest chunk when recognition falls behind."""
-        if self.audio_queue.full():
-            try:
-                self.audio_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
-        self.audio_queue.put_nowait(chunk)
+        self.loop.call_soon_threadsafe(
+            self.audio_queue.put_nowait, bytes(indata)
+        )
 
     def start_recording(self):
         for attempt in range(1, 4):
             try:
                 self.stream.start()
                 self.recording = True
-                self.logger.info("RECORDER | Audio Stream has started.")
+                self.logger.info(f"RECORDER | Audio Stream has started.")
                 break
             except sd.PortAudioError as e:
                 if "Wait timed out" in str(e) and attempt < 3:
-                    self.logger.warning(
-                        "RECORDER | Audio Server Timeout. Retrying in 2 seconds..."
-                    )
+                    self.logger.warning(f"RECORDER | Audio Server Timeout. Retrying in 2 seconds...")
                     time.sleep(2.0)
                 else:
                     raise e
@@ -58,7 +49,7 @@ class Recorder:
             self.recording = False
             self.stream.stop()
             self.stream.close()
-            self.logger.info("RECORDER | Recording stopped.")
+            self.logger.info(f"RECORDER | Recording stopped.")
 
     
     async def get_chunk(self):
